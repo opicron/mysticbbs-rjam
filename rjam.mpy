@@ -1,0 +1,2174 @@
+# -*- coding: utf-8 -*-
+# rjam.py
+# v0.12
+#
+#
+# !:
+# subbed/all view
+# (un)subscribe from areas
+# list vars in selector line or as separate value
+# expect no more than 1(!) private (email) area
+# added group/area changer 
+# private area can be added to group
+# added shutdown check
+# hdr and body scrollbars
+# quote highlights
+# define area (mailcheck)
+# full add quotes
+# writes jhr and jlr
+# full ansi support
+# arrow key controlled
+# highly customizable
+# mci control strings
+# show lastread
+# strips:
+#   |CL,|PA,|PN
+# read email filename from config instead of hardcoded
+# doesnt count edited messages double (like indexed reader :)
+# split longstrings into multiple lines
+# reads newscan data from .SCN or from default messagebase
+# no longer need to delete emails/netmail, keep history!
+# use internal message functions
+# if /YOU hide mail areas without mail
+# if /NEW hide non-new mail areas (removed-- error when all mail is read)
+# if /NEW show first message base with new mail
+# if /ALL show all areas
+# add group/area looper
+# add dynamic message read (only read few messages instead of whole base!)
+# better quote highlight, if first trimmed char (within 3 char pos) is a >
+
+
+# todo:
+# add default bg/fg to ans2str
+# why is first character lost when ans2str regular text
+# better ansi determination regular expression
+
+# implement subject only screen (instead of resizing msg hdrs)
+# mark all areas as read
+# mark area as read
+# check if config.py exists
+# get private status from messagebase to avoid ==private_bases!
+# split long desc text by word instead of 80 chars 
+# add functionality for larger message width (132), keep 80 for ansi!
+
+import os, sys, struct, time, re #, zlib
+from mystic_bbs import *                      # mystic user/config  param_str
+
+###################################################################################################################
+# Configuration
+###################################################################################################################
+
+#------------------------------------------------------------------------------------------------------
+#important: 
+#             edit your config.py.sample file and rename it to config.py in the /rjam/ directory.
+#
+#------------------------------------------------------------------------------------------------------
+
+rjamdir = getcfg()['script']+'rjam'+os.sep    # this is the dir with extra libs and data
+sys.path.append(rjamdir)                      # importing this dir to pythons path variable
+
+from ans2str import *                         # ansi2mci parser
+import config                                 # configuration
+
+# make sure default settings are loaded
+if not hasattr(config, 'private_bases'):          config.private_bases     = [1]   	
+if not hasattr(config, 'datetimefmt'):            config.datetimefmt       = "%d %b %y" #DATETIMEFMT = "%Y-%m-%d %H:%M:%S"
+if not hasattr(config, 'rep'):                    config.rep               = {"|PN": ":PN", "|PA": ":PA", "|CL": ":CL"} 
+if not hasattr(config, 'clearscr'):               config.clearscr          = '|07|16|CL'
+if not hasattr(config, 'mg_initscreen'):          config.mg_initscreen     = '|16|CL|[X01|[Y07|[K|[Y08|[K|[Y09|[K|[Y10|[K|[Y11|[K|[Y12|[K|[Y13|[K|[Y14|[K|[Y15|[K|[Y16|[K|[Y17|[K|[Y18|[K|[Y19|[K|[Y20|[K|[Y21|[K|[Y22|[K|[Y23|[K|[Y24|[K|[Y01|[X01|DFmsggroups.ans|'
+if not hasattr(config, 'mg_startpos'):            config.mg_startpos       = '|[X22|[Y09'
+if not hasattr(config, 'mg_max_lines'):           config.mg_max_lines      = 12
+if not hasattr(config, 'mg_str_group'):           config.mg_str_group      = '|16|08|$T39|&1 |$X58:'
+if not hasattr(config, 'mg_str_area'):            config.mg_str_area       = '|16|&9|&8|07|$T24|&1|$X48 |[X48|14|$L04|&3|$X53  |07|$L04|&2|$X58  '    #truncated name and right justified count
+if not hasattr(config, 'mg_str_highlight'):       config.mg_str_highlight  = '|19|&9|&8|15|$T24|&1|$X48 |[X48|14|$L04|&3|$X53  |15|$L04|&2|$X58 |16 ' #truncated name and right justified count
+if not hasattr(config, 'mg_str_empty'):           config.mg_str_empty      = '|16|$X58  '
+if not hasattr(config, 'mg_str_unsubbed'):        config.mg_str_unsubbed   = '|05>'
+if not hasattr(config, 'mg_str_new'):             config.mg_str_new        = '|14*'
+if not hasattr(config, 'mg_no_new'):              config.mg_no_new         = '|08'+chr(250)
+if not hasattr(config, 'mg_bar_start'):           config.mg_bar_start     = '|[X60|[Y09'
+if not hasattr(config, 'mg_bar_low'):             config.mg_bar_low       = '|16|08'+chr(176)
+if not hasattr(config, 'mg_bar_high'):            config.mg_bar_high      = '|16|11'+chr(178)
+if not hasattr(config, 'mg_totalmsgs'):           config.mg_totalmsgs      = ""
+if not hasattr(config, 'mg_newmsgs'):             config.mg_newmsgs        = ""
+if not hasattr(config, 'no_unsubscribe_str'):     config.no_unsubscribe_str = "Can't unsubscribe from mandatory area"
+if not hasattr(config, 'unsub_from_str'):         config.unsub_from_str     = "Unsubscribed from |&1"
+if not hasattr(config, 'sub_to_str'):             config.sub_to_str         = "Subscribed to |&1"
+if not hasattr(config, 'view_all_str'):           config.view_all_str       = 'All message bases'
+if not hasattr(config, 'view_sub_str'):           config.view_sub_str       = 'Subscribed message bases'
+if not hasattr(config, 'reader_initscreen'):      config.reader_initscreen = '|DFreader.ans|'
+if not hasattr(config, 'max_header_lines'):       config.max_header_lines  = 4
+if not hasattr(config, 'hdr_startpos'):           config.hdr_startpos      = '|[X01|[Y03|16'
+if not hasattr(config, 'hdr_str'):                config.hdr_str           = '|11| |&8|16|08|$T32|&1|$X38 |[X38|08|08|$T15|&2 |$X54 |[X54|08|08|&9|08|$T15|&3|$X69 |[X69|08|08|$T09|&4|[X78 |16 |08|'
+if not hasattr(config, 'hdr_str_new'):            config.hdr_str_new       = '|11| |&8|16|07|$T32|&1|$X38 |[X38|08|07|$T15|&2 |$X54 |[X54|08|07|&9|07|$T15|&3|$X69 |[X69|08|07|$T09|&4|[X78 |16 |08|'
+if not hasattr(config, 'hdr_str_selected'):       config.hdr_str_selected  = '|11| |&8|16|15|$T32|&1|08|$X38'+chr(250)+'|[X38|15|$T15|&2|08'+chr(250)+'|$X54'+chr(250)+'|[X54|15|&9|15|$T15|&3|08|$X69'+chr(250)+'|[X69|15|$T09|&4|08|[X78'+chr(250)+'|16 |08|'
+if not hasattr(config, 'hdr_str_unread'):         config.hdr_str_unread    = '|05>'
+if not hasattr(config, 'hdr_clearstr'):           config.hdr_clearstr      = ' |$X77 '
+if not hasattr(config, 'hdr_bar_start'):          config.hdr_bar_start     = '|[X79|[Y03'
+if not hasattr(config, 'hdr_bar_low'):            config.hdr_bar_low       = '|16|08'+chr(176)
+if not hasattr(config, 'hdr_bar_high'):           config.hdr_bar_high      = '|16|11'+chr(178)
+if not hasattr(config, 'mid_first'):              config.mid_first       = "|16|03`------------------------------------------------------------------------------'"
+if not hasattr(config, 'mid_second'):             config.mid_second      = "|16|13::|05::                                                                        |05::|13::"
+if not hasattr(config, 'max_body_lines'):         config.max_body_lines            = 13
+if not hasattr(config, 'msg_body_startpos'):      config.msg_body_startpos         = '|[X01|[Y10'
+if not hasattr(config, 'msg_body_clearstr'):      config.msg_body_clearstr         = '|16|[K'
+if not hasattr(config, 'msg_body_default'):       config.msg_body_default          = '|09'
+if not hasattr(config, 'msg_body_quote_highlight'):config.msg_body_quote_highlight  = '|05'
+if not hasattr(config, 'msg_body_low'):           config.msg_body_low              = '|08'
+if not hasattr(config, 'body_bar_start'):         config.body_bar_start            = '|[X71|[Y23'
+if not hasattr(config, 'msg_no_messages'):        config.msg_no_messages           = 'No messages in |&1 base found.' #|&1 base name
+if not hasattr(config, 'dialog_text_str'):        config.dialog_text_str           = '|15|23|&9|16' #|&9 is the displayed text
+if not hasattr(config, 'dialog_press_any_key'):   config.dialog_press_any_key      = '|15|23 [press any key]'
+if not hasattr(config, 'delete_msg'):             config.delete_msg                = 'Message removed.'
+
+#-- no edits beyong this point please!
+
+debug = False
+
+###################################################################################################################
+# Keys
+###################################################################################################################
+
+#------------------------------------------------------------------------------
+KEY_UP       = chr(72)       # Some keyboard code defines returned by input functions
+KEY_SPACE    = chr(32)
+KEY_DOWN     = chr(80)
+KEY_ESCAPE   = chr(27)
+KEY_ENTER    = chr(13)
+KEY_TAB      = chr(9)
+KEY_LEFT     = chr(75)
+KEY_RIGHT    = chr(77)
+KEY_PGUP     = chr(73)
+KEY_PGDN     = chr(81)
+KEY_END      = chr(79)
+KEY_HOME     = chr(71)
+KEY_CTRLA    = chr(1)
+KEY_CTRLD	   = chr(4)
+KEY_CTRLN    = chr(14)
+KEY_CTRLR    = chr(18)
+KEY_CTRLS	   = chr(19)
+KEY_CTRLU	   = chr(21)
+KEY_CTRLZ    = chr(26)
+KEY_QMARK    = chr(63)
+#------------------------------------------------------------------------------
+
+
+###################################################################################################################
+# Ansi
+###################################################################################################################
+
+#------------------------------------------------------------------------------
+#ansi_escape_regex = r'(?:\x1B[@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]'
+ansi_escape_regex = r'\x1b\[[0-9;]'
+ansi_escape = re.compile(ansi_escape_regex)
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+# utf codes to ascii
+#------------------------------------------------------------------------------
+def utf_to_ascii( s ):
+    
+    dictionary = {
+        #remove CNet color codes
+        'c0':'|00',
+        'c1':'|04', #red (was |12)
+        'c2':'|02',
+        'c3':'|06',
+        'c4':'|01',
+        'c5':'|05',
+        'c6':config.msg_body_default, #'|03'
+        'c7':'|11',              
+        'c8':'|08',
+        'c9':'|12',
+        'ca':'|10', #green
+        'cb':'|14', #yellow
+        'cc':'|09', 
+        'cd':'|13', #magenta
+        'ce':'|11',
+        'cf':'|15',
+        'z1':'|16',
+        'z2':'|18',
+        'z3':'|22',        
+        'z4':'|17',        
+        'z5':'|21',        
+        'z6':'|19',        
+        'z7':'|23',        
+        'q1':'', #default?
+        'n1':'', #|CR
+        'f1':'', #|CL
+        '\xe2\x96\x80':chr(223),
+        '\xe2\x96\x84':chr(220),
+        '\xe2\x96\x88':chr(219),
+        '\xe2\x96\x91':chr(176),
+        '\xe2\x96\x92':chr(177),
+        '\xe2\x96\x93':chr(178),
+        '\xe2\x80\x99':"'",
+        '\xe2\x80\x90':'-',
+        '\xe2\x80\x91':'-',
+        '\xe2\x80\x92':'-',
+        '\xe2\x80\x93':'-',
+        '\xe2\x80\x94':'-',
+        '\xe2\x80\x94':'-',
+        '\xe2\x80\x98':"'",
+        '\xe2\x80\x9b':"'",
+        '\xe2\x80\x9c':'"',
+        '\xe2\x80\x9c':'"',
+        '\xe2\x80\x9d':'"',
+        '\xe2\x80\x9e':'"',
+        '\xe2\x80\x9f':'"',
+        '\xe2\x80\xa6':'...',
+        '\xe2\x80\xb2':"'",
+        '\xe2\x80\xb3':"'",
+        '\xe2\x80\xb4':"'",
+        '\xe2\x80\xb5':"'",
+        '\xe2\x80\xb6':"'",
+        '\xe2\x80\xb7':"'",
+        '\xe2\x81\xba':"+",
+        '\xe2\x81\xbb':"-",
+        '\xe2\x81\xbc':"=",
+        '\xe2\x81\xbd':"(",
+        '\xe2\x81\xbe':")",
+
+        '\xc3\xa9':chr(130), # é
+        '\xc2\xa1':chr(173), # ¡ INVERTED EXCLAMATION MARK
+        '\xc2\xa2':chr(155), # ¢ CENT SIGN
+        '\xc2\xa3':chr(156), # £ POUND SIGN
+        #'\xc2\xa4':chr() ¤ CURRENCY SIGN
+        '\xc2\xa5':chr(157), # ¥ YEN SIGN
+        '\xc2\xa6':'|', # ¦ BROKEN BAR
+        # '\xc2\xa7' § SECTION SIGN
+        '\xc2\xa8':'"', # ¨ DIAERESIS
+        '\xc2\xa9':'(C)', # © COPYRIGHT SIGN
+        # '\xc2\xaa' ª FEMININE ORDINAL INDICATOR
+        '\xc2\xab':chr(174), # « LEFT-POINTING DOUBLE ANGLE QUOTATION MARK
+        '\xc2\xac':chr(170), # ¬ NOT SIGN
+        '\xc2\xad':'-', # ­ SOFT HYPHEN
+        '\xc2\xae':'(R)', # ® REGISTERED SIGN
+        '\xc2\xaf':'-', # ¯ MACRON
+        '\xc2\xb0':chr(248), # ° DEGREE SIGN
+        '\xc2\xb1':chr(241), # ± PLUS-MINUS SIGN
+        '\xc2\xb2':chr(253), # ² SUPERSCRIPT TWO
+        # '\xc2\xb3' ³ SUPERSCRIPT THREE
+        '\xc2\xb4':"'", # ´ ACUTE ACCENT
+        '\xc2\xb5':chr(230), # µ MICRO SIGN
+        # '\xc2\xb6' ¶ PILCROW SIGN
+        '\xc2\xb7':chr(249), # · MIDDLE DOT
+        '\xc2\xb8':chr(250), # ¸ CEDILLA
+        # '\xc2\xb9' ¹ SUPERSCRIPT ONE
+        # '\xc2\xba' º MASCULINE ORDINAL INDICATOR
+        '\xc2\xbb':'>>', # » RIGHT-POINTING DOUBLE ANGLE QUOTATION MARK
+        '\xc2\xbc':chr(172), # ¼ VULGAR FRACTION ONE QUARTER
+        '\xc2\xbd':chr(171), # ½ VULGAR FRACTION ONE HALF
+        # '\xc2\xbe' ¾ VULGAR FRACTION THREE QUARTERS
+        '\xc2\xbf':chr(168), # ¿ INVERTED QUESTION MARK
+
+        '\xc3\x80':chr(133), # À LATIN CAPITAL LETTER A WITH GRAVE
+        '\xc3\x81':chr(160), # Á LATIN CAPITAL LETTER A WITH ACUTE
+        '\xc3\x82':chr(131), # Â LATIN CAPITAL LETTER A WITH CIRCUMFLEX
+        '\xc3\x83':chr(131), # Ã LATIN CAPITAL LETTER A WITH TILDE
+        '\xc3\x84':chr(142), # Ä LATIN CAPITAL LETTER A WITH DIAERESIS
+        '\xc3\x85':chr(143), # Å LATIN CAPITAL LETTER A WITH RING ABOVE
+        '\xc3\x86':chr(146), # Æ LATIN CAPITAL LETTER AE
+        '\xc3\x87':chr(128), # Ç LATIN CAPITAL LETTER C WITH CEDILLA
+        '\xc3\x88':chr(144), # È LATIN CAPITAL LETTER E WITH GRAVE
+        '\xc3\x89':chr(144), # É LATIN CAPITAL LETTER E WITH ACUTE
+        '\xc3\x8a':chr(136), # Ê LATIN CAPITAL LETTER E WITH CIRCUMFLEX
+        '\xc3\x8b':chr(137), # Ë LATIN CAPITAL LETTER E WITH DIAERESIS
+        '\xc3\x8c':chr(141), # Ì LATIN CAPITAL LETTER I WITH GRAVE
+        '\xc3\x8d':chr(161), # Í LATIN CAPITAL LETTER I WITH ACUTE
+        '\xc3\x8e':chr(140), # Î LATIN CAPITAL LETTER I WITH CIRCUMFLEX
+        '\xc3\x8f':chr(139), # Ï LATIN CAPITAL LETTER I WITH DIAERESIS
+        '\xc3\x90':'D', # Ð LATIN CAPITAL LETTER ETH
+        '\xc3\x91':chr(165), # Ñ LATIN CAPITAL LETTER N WITH TILDE
+        '\xc3\x92':chr(149), # Ò LATIN CAPITAL LETTER O WITH GRAVE
+        '\xc3\x93':chr(162), # Ó LATIN CAPITAL LETTER O WITH ACUTE
+        '\xc3\x94':chr(147), # Ô LATIN CAPITAL LETTER O WITH CIRCUMFLEX
+        '\xc3\x95':chr(153), # Õ LATIN CAPITAL LETTER O WITH TILDE
+        '\xc3\x96':chr(153), # Ö LATIN CAPITAL LETTER O WITH DIAERESIS
+        '\xc3\x97':'x', # × MULTIPLICATION SIGN
+        '\xc3\x98':chr(237), # Ø LATIN CAPITAL LETTER O WITH STROKE
+        '\xc3\x99':chr(151), # Ù LATIN CAPITAL LETTER U WITH GRAVE
+        '\xc3\x9a':chr(163), # Ú LATIN CAPITAL LETTER U WITH ACUTE
+        '\xc3\x9b':chr(150), # Û LATIN CAPITAL LETTER U WITH CIRCUMFLEX
+        '\xc3\x9c':chr(154), # Ü LATIN CAPITAL LETTER U WITH DIAERESIS
+        '\xc3\x9d':'Y', # Ý LATIN CAPITAL LETTER Y WITH ACUTE
+        # '\xc3\x9e': Þ LATIN CAPITAL LETTER THORN
+        '\xc3\x9f':chr(225), # ß LATIN SMALL LETTER SHARP S
+        '\xc3\xa0':chr(133), # à LATIN SMALL LETTER A WITH GRAVE
+        '\xc3\xa1':chr(160), # á LATIN SMALL LETTER A WITH ACUTE
+        '\xc3\xa2':chr(131), # â LATIN SMALL LETTER A WITH CIRCUMFLEX
+        '\xc3\xa3':'a', # ã LATIN SMALL LETTER A WITH TILDE
+        '\xc3\xa4':chr(132), # ä LATIN SMALL LETTER A WITH DIAERESIS
+        '\xc3\xa5':chr(134), # å LATIN SMALL LETTER A WITH RING ABOVE
+        '\xc3\xa6':chr(145), # æ LATIN SMALL LETTER AE
+        '\xc3\xa7':chr(134), # ç LATIN SMALL LETTER C WITH CEDILLA
+        '\xc3\xa8':chr(138), # è LATIN SMALL LETTER E WITH GRAVE
+        '\xc3\xa9':chr(138), # é LATIN SMALL LETTER E WITH ACUTE
+        '\xc3\xaa':chr(136), # ê LATIN SMALL LETTER E WITH CIRCUMFLEX
+        '\xc3\xab':chr(137), # ë LATIN SMALL LETTER E WITH DIAERESIS
+        '\xc3\xac':chr(141), # ì LATIN SMALL LETTER I WITH GRAVE
+        '\xc3\xad':chr(161), # í LATIN SMALL LETTER I WITH ACUTE
+        '\xc3\xae':chr(140), # î LATIN SMALL LETTER I WITH CIRCUMFLEX
+        '\xc3\xaf':chr(139), # ï LATIN SMALL LETTER I WITH DIAERESIS
+        '\xc3\xb0':chr(235), # ð LATIN SMALL LETTER ETH
+        '\xc3\xb1':chr(164), # ñ LATIN SMALL LETTER N WITH TILDE
+        '\xc3\xb2':chr(149), # ò LATIN SMALL LETTER O WITH GRAVE
+        '\xc3\xb3':chr(162), # ó LATIN SMALL LETTER O WITH ACUTE
+        '\xc3\xb4':chr(147), # ô LATIN SMALL LETTER O WITH CIRCUMFLEX
+        '\xc3\xb5':'o', # õ LATIN SMALL LETTER O WITH TILDE
+        '\xc3\xb6':chr(148), # ö LATIN SMALL LETTER O WITH DIAERESIS
+        '\xc3\xb7':chr(246), # ÷ DIVISION SIGN
+        '\xc3\xb8':chr(237), # ø LATIN SMALL LETTER O WITH STROKE
+        '\xc3\xb9':chr(164), # ù LATIN SMALL LETTER U WITH GRAVE
+        '\xc3\xba':chr(164), # ú LATIN SMALL LETTER U WITH ACUTE
+        '\xc3\xbb':'u', # û LATIN SMALL LETTER U WITH CIRCUMFLEX
+        '\xc3\xbc':chr(129), # ü LATIN SMALL LETTER U WITH DIAERESIS
+        '\xc3\xbd':'y', # ý LATIN SMALL LETTER Y WITH ACUTE
+        # '\xc3\xbe' þ LATIN SMALL LETTER THORN
+        '\xc3\xbf':chr(152), # ÿ LATIN SMALL LETTER Y WITH DIAERESIS
+
+        '\xf9\xa4':'u',
+        '\xc4\x99':'e',
+        '\xc4\x97':'e',
+        '\xc4\x93':'e'
+    }
+
+    #replace extended chars with ascii counterparts
+    for key in dictionary.keys():
+        p = re.compile(key,re.UNICODE)
+        s = re.sub(p,dictionary[key],s) #or #s = re.sub(key,dictionary[key],s)
+    
+    return s
+#------------------------------------------------------------------------------
+
+###################################################################################################################
+# Defs
+###################################################################################################################
+
+
+#------------------------------------------------------------------------------
+def clrscr():
+  write(config.clearscr)
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def pause(visible=False):
+  if not visible:
+    write('|PN')
+  else:
+    write('|PA')
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def stripmcicolor (s):
+
+    #match only 00-19 and 20-23
+    s = re.sub( r'\|([0-1][0-9]|[2][0-3])', '', s )
+    
+    return s
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+def stripmci (str):
+	pos = str.find("|")
+ 	while pos != -1:
+		str = str[:pos] + str[pos+3:]
+		pos = str.find("|")
+	return str
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def xwindow(title,typo,x1,y1,x2,y2):
+  write('|#X#'+str(typo)+'#'+str(title)+'#'+str(x1)+'#'+str(y1)+'#'+str(x2)+'#'+str(y2)+'#');
+#------------------------------------------------------------------------------  
+
+
+#------------------------------------------------------------------------------
+def msgdialog(title,text,p=True):
+  s = config.dialog_text_str.replace('|&9',text) + config.dialog_press_any_key
+  a = len(stripmci(s))
+  if a<75:
+    xwindow(title,1,40-(a // 2)-2,10,40+(a // 2)+2,14)
+    gotoxy(40-(a // 2),12)
+    write(s)
+
+  if p: pause()  
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def updatebar(start_pos, index, total, height, vertical=True):
+
+    if vertical == True:
+      for i in range(0,height+1):
+          pos = mci_adjust_y(start_pos,i)
+          write(pos+config.hdr_bar_low)
+      
+      y = 0
+      if total > 0: 
+          y = (index * (height + 1)) // total        
+      pos = mci_adjust_y(start_pos,y)        
+      write(pos+config.hdr_bar_high)
+
+    else:
+
+      barlen = 6
+      #(height // 2)
+
+      for i in range(0,barlen):
+          pos = mci_adjust_x(start_pos,i)
+          write(pos+config.hdr_bar_low)
+
+      total = total - height
+      if total < 1:
+        x = barlen
+      else:
+        x = (float(index) / float(total) ) * barlen
+
+      i = 0
+      while i < x:
+        pos = mci_adjust_x(start_pos,i)  
+        write(pos+config.hdr_bar_high)   
+        i += 1
+
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def get_quote_from_name(name):
+  if name.find(' ') == -1:
+    return name[:2]
+  else:
+    quote = ""
+    for word in name.split(): 
+      quote += word[0]
+
+    return quote[:2]
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def issysop():
+  global user
+  global sysop_level
+
+  if user['level'] >= sysop_level:
+    return True
+  else:
+    return False
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def TimeStr(t):
+  return time.strftime(config.datetimefmt, time.gmtime(t)) if t != 0 else "0"
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def getgroupfromacs(acs):
+  p = acs.find('g')
+  if p < 0:
+    return -1
+  p += 1
+  v = ''
+  while True:
+    c = acs[p:p+1]
+    if ord(c) in range(48,58):
+      v += c
+    else:
+      break
+    p += 1
+    if p ==  len(acs): break
+  return int(v)
+#------------------------------------------------------------------------------
+
+
+###################################################################################################################
+# Group / Area functions
+###################################################################################################################
+
+
+#------------------------------------------------------------------------------
+def get_mailbases():
+    global mailgroups
+    global mailbases
+
+    mailgroups =  []
+    mailbases =   []
+    nogrouparea = []    
+
+    #init for group loop
+    mg = []
+    i = 0
+
+    #get groups by file record position
+    while mg != None:
+
+      mg = getmgroup(i)
+
+      #if message group exists
+      if mg != None:
+        if access(mg['acs']):
+
+          #add group to list
+          mailgroups.append(mg)
+
+          #change mailgroup to read areas
+          menucmd('MG',str(mg['id']))
+          
+          #init for area loop
+          mb = []
+          j = 0
+
+          #get areas by record position
+          while mb != None:
+            mb = getmbase(j)
+
+            # if area exists
+            if mb != None:
+              group = getgroupfromacs(mb['listacs'])
+
+              if access(mb['listacs']) and group != -1: 
+                
+                mb['groupid'] = mg['id']
+                mailbases.append(mb)
+
+              #if no group add area to start of list
+              elif access(mb['listacs']) and group == -1:                            
+              
+                #keep track of added areas without group
+                if j not in nogrouparea:
+                  nogrouparea.append(j)
+                  mb['groupid'] = -1;                
+                  mailbases.insert(0,mb)              
+
+            j += 1
+
+      i += 1                
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def get_new_mail_count():
+  global user
+  global mailbases
+  global msgs
+  global file
+
+  #loop indexed mailareas  
+  for i in range(len(mailbases)):
+    base = mailbases[i]
+    mailbase = getmbaseid(base['id'])
+      
+    #set this to make sure get_msgs knows what to do
+    user['mbase'] = base['id']
+  
+    new = 0    
+    total = 0
+
+    if mailbase == None:
+      msgdialog(' Error ','Msgbase not found!')
+      return
+
+    file = mailbase['path']+mailbase['filename'] #no extension
+      
+    msgs    = []
+    msgbase = msg_open(file)
+    
+    # get lastread      
+    lr = msg_getlr (msgbase, user['id'])   
+
+    # get stats
+    total, new, yours, lastpost = msg_stats(msgbase)
+
+    if 'YOU' in actions:
+      if base['id'] in config.private_bases:
+        mailbases[i]['total'] = total
+      else:
+        mailbases[i]['total'] = -1
+      mailbases[i]['new'] = yours
+    elif base['id'] in config.private_bases:
+      mailbases[i]['total'] = total
+      mailbases[i]['new'] = yours
+    else:
+      mailbases[i]['total'] = total
+      mailbases[i]['new'] = new
+    
+
+    msg_close(msgbase)
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def purge_areas():
+  global user
+  global mailbases
+  global msgs
+  global actions
+  global file
+
+  newbases = []
+
+  for i in range(len(mailbases)):
+
+    if 'ALL' in actions:
+      newbases.append(mailbases[i])
+
+    #if 'YOU' in actions and 'NEW' not in actions and mailbases[i]['total'] != 0: #gives problem when mail is read-- no new mail is left
+    #elif 'YOU' in actions and mailbases[i]['total'] != 0:
+
+    # NEW
+    elif 'NEW' in actions and mailbases[i]['new'] != 0:
+      newbases.append(mailbases[i])
+
+    # YOU & !NEW
+    elif 'YOU' in actions and not 'NEW' in actions: # and mailbases[i]['total'] != 0:
+      newbases.append(mailbases[i])
+
+    # !YOU & !NEW
+    elif 'NEW' not in actions and 'YOU' not in actions:
+      newbases.append(mailbases[i])
+
+  mailbases = newbases
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+def get_subscriptions():
+  global user
+  global mailbases
+
+  #loop indexed mailareas  
+  for i in range(len(mailbases)):
+    base = mailbases[i]
+
+    #if base['id'] != email_base:
+    mailbase = getmbaseid(base['id'])
+    
+    #set this to make sure get_msgs knows what to do
+    user['mbase'] = base['id']
+
+    if mailbase == None:
+      msgdialog(' Error ','Msgbase not found!')
+      return
+    
+    file = mailbase['path']+mailbase['filename'] #no extension
+    basename = mailbase['filename'].upper()
+
+    mailbases[i]['subbed'] = read_msgbase_subscription(base['id'], file)[0]
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def loadmainlist(count=False):
+  global mailbases
+  global mailgroups
+  global viewmode
+
+  if count==False:
+    get_mailbases()
+
+  get_subscriptions()
+
+  get_new_mail_count()
+  purge_areas()
+
+  res = []
+
+  # loop groups
+  for i in range(len(mailgroups)):
+    if access(mailgroups[i]['acs']):
+
+      count = 0        
+      areas = []    
+      #loop areas
+      for j in range(len(mailbases)):
+        ma_group = getgroupfromacs(mailbases[j]['listacs'])            
+        
+        if ma_group == mailgroups[i]['id']: 
+
+          #add base   
+          if 'ALL' in actions or viewmode == "ALL" or mailbases[j]['subbed'] > 0:
+            count += 1
+            areas.append({'subbed':mailbases[j]['subbed'],'total':mailbases[j]['total'],'new':mailbases[j]['new'],'id':mailbases[j]['id'],'name':mailbases[j]['name'],'type':'mbase','acs':mailbases[j]['listacs'],'target':str(mailbases[j]['id']),'desc':'','groupid':mailgroups[i]['id']})
+
+      #add group
+      if count > 0:    
+        res.append({'name':mailgroups[i]['name'],'type':'group','acs':mailgroups[i]['acs']})   #,'target':filegroups[i]['id']
+        res += areas
+
+
+  #loop again for fileareas without parent groups
+  for j in range(len(mailbases)):        
+      ma_group = getgroupfromacs(mailbases[j]['listacs'])      
+      if ma_group == -1:
+
+        #add base
+        if 'ALL' in actions or viewmode == "ALL" or mailbases[j]['subbed'] > 0:
+          res.insert(0,{'subbed':mailbases[j]['subbed'],'total':mailbases[j]['total'],'new':mailbases[j]['new'],'id':mailbases[j]['id'],'name':mailbases[j]['name'],'type':'mbase','acs':mailbases[j]['listacs'],'target':str(mailbases[j]['id']),'desc':'','groupid':mailgroups[i]['id']})
+
+
+  return res
+#------------------------------------------------------------------------------
+
+
+###################################################################################################################
+# Message base functions
+###################################################################################################################
+
+
+#------------------------------------------------------------------------------
+#def set_bit(v, index, x):
+#  #"""Set the index:th bit of v to 1 if x is truthy, else to 0, and return the new value."""
+#  mask = 1 << index   # Compute mask, an integer with just bit 'index' set.
+#  v &= ~mask          # Clear the bit indicated by the mask (if x is False)
+#  if x:
+#    v |= mask         # If x was True, set the bit indicated by the mask.
+#  return v            # Return the result, we're done.
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def delete_msg_num(index, msg):
+  global user
+  global file
+  global msgbase
+
+  msg_seek(msgbase, int(msg['msg_number'])) 
+  msghdr = msg_gethdr(msgbase)
+    
+  #double check! seek should get correct index, but with message number check we are sure
+  if int(msghdr["number"]) == msg['msg_number']:
+    msg_delete(msgbase)    
+#------------------------------------------------------------------------------  
+
+
+#------------------------------------------------------------------------------
+def get_last_read_msg_num():
+  global user
+  global msgbase
+
+  lr = msg_getlr (msgbase, user['id'])
+
+  return lr
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def write_last_read_msg_num(msg_num,force=False):
+  global user
+  global msgbase
+
+  msg_setlr (msgbase, user["id"], user["handle"], msg_num)
+  
+  return msg_num
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def read_msgbase_subscription(mbaseid, file):  
+  global user
+
+  fmtlr = "<LBB"
+  fmtlr_s = struct.calcsize(fmtlr)
+
+  fileNameSub = file+".scn"
+
+  #there must be a better way?
+  if os.path.isfile(fileNameSub) == False:
+    f = open(fileNameSub, 'wb')
+    f.close()
+
+  jlrf = open(fileNameSub, "r + b")
+
+  class MSGLR:
+    pass
+  
+  offset      = 0
+  newscan     = -1
+  qwkscan     = 1
+
+  lr = MSGLR()
+
+  while True:
+    offset = jlrf.tell()
+    msgstr = jlrf.read(fmtlr_s)
+    l = len(msgstr)
+    if l != fmtlr_s:
+      if l > 0:
+        print "Error: %d extranious bytes at end of file", l
+      break
+    
+    ( lr.UserID
+    , lr.NewScan
+    , lr.qwkscan ) = struct.unpack(fmtlr, msgstr)
+
+    #if userid match
+    if lr.UserID == user['id']:
+      newscan = lr.NewScan
+      qwkscan = lr.qwkscan
+      break
+    
+  #close file
+  jlrf.close()
+
+  if newscan == -1:
+    #try to find default value in mbase
+    base = getmbaseid(mbaseid)
+    newscan = base['defnscan']
+
+  #no id found, offset 0
+  return newscan, qwkscan, offset
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def write_msgbase_subscription(mbaseid, newscan):
+
+  global user
+
+  mailbase = getmbaseid(mbaseid)
+  file = mailbase['path']+mailbase['filename'] #no extension
+  
+  fmtlr = "<LBB"
+  fmtlr_s = struct.calcsize(fmtlr)
+
+  #initialize
+  current_newscan, qwkscan, offset = read_msgbase_subscription(mbaseid, file)
+
+  fileNameSub = file+".scn"
+  jlrf = open(fileNameSub, "r + b")
+  jlrf.seek(offset)
+  
+  #default new record
+  msgstr = struct.pack(fmtlr, user['id'], newscan, qwkscan)
+
+  jlrf.write(msgstr)
+  jlrf.close()
+  
+  return read_msgbase_subscription(mbaseid, file)[0]
+#------------------------------------------------------------------------------
+
+
+def processmsg(msghdr):
+  global user
+  global actions
+
+  msg = dict()
+
+  if msghdr['deleted'] == False:
+  
+    add = True
+
+    #email/private areas
+    if user['mbase'] in config.private_bases:
+        add = False
+
+        #both from/to name/handle are added
+        if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['from'].upper() or user["handle"].upper() == msghdr['from'].upper():
+          add = True
+
+    #if only show mail to you (undo previous set add flag)
+    if "YOU" in actions:
+      if user["handle"].upper() != msghdr['to'].upper() and user["name"].upper() != msghdr['to'].upper() and user["handle"].upper() != msghdr['from'].upper() and user["name"].upper() != msghdr['from'].upper():
+        add = False
+
+    if add == True:
+
+      msg['msg_date']     = TimeStr(msghdr['date'])
+      msg['msg_number']   = msghdr['number']
+      msg['msg_subject']  = msghdr['subj']
+      msg['msg_from']     = msghdr['from']
+      msg['msg_to']       = msghdr['to']
+
+      return msg, True
+
+  return msg, False 
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def load_prevmsg(index):
+    global file
+    global msgs
+    global msg_count
+    global msgbase
+
+    msg_seek(msgbase, int(index)) 
+
+    while msg_found(msgbase) and not shutdown():      
+      msghdr = msg_gethdr(msgbase)
+      msg, add = processmsg(msghdr)
+      if add:
+        if len(msgs) == 0 or msgs[0]['msg_number'] <> msg['msg_number']:
+          msgs.insert(0,msg)
+          msg_count += 1
+          return True          
+      msg_prev(msgbase)       
+
+    return False
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def load_nextmsg(index):
+    global file
+    global msgs
+    global msg_count
+    global msgbase
+
+    msg_seek(msgbase, int(index)) 
+
+    while msg_found(msgbase) and not shutdown():
+      
+      msghdr = msg_gethdr(msgbase)
+      tmpid = int(msghdr['number'])
+      msg, add = processmsg(msghdr)
+      if add:
+        if len(msgs) == 0 or msgs[len(msgs)-1]['msg_number'] <> msg['msg_number']:
+          msgs.append(msg)
+          msg_count += 1
+          return True
+      msg_next(msgbase)       
+
+    return False
+#------------------------------------------------------------------------------
+
+    
+#------------------------------------------------------------------------------
+def get_msgs(index=-1):
+    global msg_count
+    global msgs
+    global msg_lastID
+    global msgbase
+    
+    msgs      = []
+    msg_count = 0
+    msg_index = 0 
+
+    if msgbase is None:
+      quit()
+
+    msg_seek(msgbase, 0) 
+    msghdr = msg_gethdr(msgbase)
+    msg_lastID = msghdr['highmsg']
+
+    lr = get_last_read_msg_num() 
+    if index == -1:
+      index = lr #start at last read position
+    
+    msg_seek(msgbase, index)    
+
+    #bugfix!
+    #this fixes the problem if last message has been deleted (making highmsg incorrect)    
+    bugfix = 0
+    if bugfix == 0 and index == msg_lastID: 
+      msghdr = msg_gethdr(msgbase)    
+      if int(msghdr['number']) <> int(msg_lastID):
+        msg_prev(msgbase)
+   
+    count = 0
+    while msg_found(msgbase) and count <= 10 and not shutdown():
+      msghdr = msg_gethdr(msgbase)    
+      msg, add = processmsg(msghdr)
+      if add:
+        if len(msgs) == 0 or msgs[0]['msg_number'] <> msg['msg_number']:          
+          msgs.insert(0,msg)
+          msg_count += 1
+          count += 1
+      msg_prev(msgbase)       
+
+    
+    ## read messages forward
+    msg_seek(msgbase, index) 
+    count = 0
+    while msg_found(msgbase) and count <= 10 and not shutdown():
+      msghdr = msg_gethdr(msgbase)
+      msg, add = processmsg(msghdr)
+      if add:
+        if len(msgs) == 0 or msgs[len(msgs)-1]['msg_number'] <> msg['msg_number']:
+          msgs.append(msg)
+          msg_count += 1
+          count += 1
+      msg_next(msgbase)       
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def get_msg_body(index,msg,echohdr=False):
+
+    global user
+    global file
+    global msgbase
+
+    if msgbase is None:
+      quit()
+
+    msg_seek(msgbase, int(msg['msg_number'])) 
+    msghdr = msg_gethdr(msgbase)
+    
+    #double check! seek should get correct index, but with message number check we are sure
+    if msghdr["number"] == int(msg['msg_number']):
+      newtxt = []
+      msgtxt = msg_gettxt(msgbase)
+
+      #remove echomail information        
+      if echohdr == False:
+        for i in range(len(msgtxt)):
+          if msgtxt[i].find("") != 0:
+            newtxt.append(msgtxt[i])
+      else:
+        newtxt = msgtxt
+
+      #concat dict into one string
+      #\n\r = double cariage in ascii
+      #\n = no enters in ascii
+      msgbody = '\r'.join(newtxt)
+
+    return msgbody
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+def index_msgs(mbaseid,index=-1):
+    global cfg
+    global user
+    global file
+    global basename
+    global msgbase
+
+    base = getmbaseid(mbaseid)
+
+    if user == None:
+        msgdialog(' Error ','User not found!')
+        return  
+
+    file = base['path']+base['filename'] #no extension
+    basename = base['filename'].upper()
+
+    if base == None:
+      msgdialog(' Error ','Msgbase not found!')
+      return
+    
+    #this could cause issues if private base has some extended acs requirements
+    if access(base['listacs']) or mbaseid in config.private_bases:
+      msgbase = msg_open(file)
+      get_msgs(index)
+#------------------------------------------------------------------------------
+    
+
+##########################################################################################################################
+# Regex 
+##########################################################################################################################
+
+#------------------------------------------------------------------------------
+def regex_replace(s,keyarray):
+  for match in re.findall(r'\%\w+', s):
+
+    s = re.sub(match, keyarray[re.sub(r'\%','',match)], s)
+
+  return s
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+def mci_adjust_y(s,i=0):
+  for match in re.findall(r'\|\[Y([0-9]{2})', s):
+    pos = int(match)
+    pos += i
+    s = s.replace('|[Y'+match, '|[Y'+str(pos).zfill(2)) 
+
+  return s
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def mci_adjust_x(s,i=0):
+  for match in re.findall(r'\|\[X([0-9]{2})', s):
+    pos = int(match)
+    pos += i
+    s = s.replace('|[X'+match, '|[X'+str(pos).zfill(2)) 
+
+  return s
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def mci_extract_y(s):
+  for match in re.findall(r'\|\[Y([0-9]{2})', s):
+    pos = int(match)
+    return pos
+
+  return -1
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def mci_extract_x(s):
+  for match in re.findall(r'\|\[X([0-9]{2})', s):
+    pos = int(match)
+    return pos
+
+  return -1
+#------------------------------------------------------------------------------
+
+
+##########################################################################################################################
+# Draw message body
+##########################################################################################################################
+
+#------------------------------------------------------------------------------
+def multiple_replace(string, rep_dict):
+    pattern = re.compile("|".join([re.escape(k) for k in sorted(rep_dict,key=len,reverse=True)]), flags=re.DOTALL)
+    return pattern.sub(lambda x: rep_dict[x.group(0)], string)
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+def draw_msg_body(msg,index,top=0,dumpquote=False,echohdr=False):
+  global msgtext
+  global msglines
+  global old_body_top
+  global cfg
+  global user
+  global debug
+
+  #get quote name (first two letters or if spaces first two word letters)
+  #used for message quote dump
+  quote_to    = get_quote_from_name(msg['msg_to'])
+  quote_from  = get_quote_from_name(msg['msg_from']) 
+
+  if msgtext == None or dumpquote == True:
+    #reset old position
+    old_body_top = -1
+
+    msgtext = get_msg_body(index,msg,echohdr)
+    msgtext = multiple_replace(msgtext, config.rep)
+    msgtext = utf_to_ascii( msgtext )
+
+    if ansi_escape.search(msgtext) != None:
+      msgtext = ansi2mci(msgtext,dumpquote)
+      #msgtext = ansi2mci('/mystic/themes/default/text/test1.ans',dumpquote,True)    
+      #msgtext = ansi2mci('/mystic/themes/default/text/ungenannt-darkness.ans',dumpquote,True)
+    else:
+      msgtext = msgtext.splitlines()
+
+      splittext = []
+      for i in range(len(msgtext)):
+
+        count = 0
+        prefix = ""
+        if msgtext[i].strip()[:15].rfind('>') > -1:
+          prefix = msgtext[i][:msgtext[i][:15].rfind('>') + 1] + ' '
+
+        #truncate and add quotemarks where needed
+        while len(msgtext[i]) > 80:          
+          spacepos = msgtext[i][:80].rfind(' ')
+          if spacepos < (80 - 20) or spacepos == -1:
+            spacepos = 79
+
+          if count == 0:
+            splittext.append( msgtext[i][:spacepos] )
+          else:
+            splittext.append( prefix + msgtext[i][:spacepos] )
+          msgtext[i] = str(msgtext[i][spacepos+1:])
+
+          count += 1
+
+        if count > 0:
+          splittext.append( prefix + msgtext[i])
+        else:
+          splittext.append( msgtext[i])
+
+      msgtext = splittext
+
+    msglines = len(msgtext)
+  
+  if dumpquote == True:
+    
+    #dump body as quote
+    msgtmpf = cfg['temp']+'msgtmp'
+    f = open(msgtmpf,'w')
+    for i in range(len(msgtext)):
+      f.write(' '+quote_from+'> '+stripmcicolor(msgtext[i])+'\r')
+    return 
+
+  else:
+        
+    #draw body
+    if top >= msglines-config.max_body_lines:
+      top = msglines-config.max_body_lines
+
+    if top < 0:
+      top = 0
+
+    updatebar(config.body_bar_start, top, msglines, config.max_body_lines, False)
+
+    if old_body_top <> top:
+
+      start_y = mci_extract_y(config.msg_body_startpos + config.msg_body_default)  
+      old_body_top = top
+
+      j = 0
+      while j<config.max_body_lines and start_y != -1:
+
+        pos = mci_adjust_y(config.msg_body_startpos + config.msg_body_default,j)      
+        write(pos)
+        
+        # draw msg body
+        if j+top<msglines:
+
+          # check if highlight variations
+          if msgtext[j+top].strip()[:3].find('>') > -1:
+            write(config.msg_body_quote_highlight)
+          elif j == 0 and msgtext[j+top].strip()[:3].upper().find('ON ') == 0:
+            write(config.msg_body_low)
+          elif j+top > msglines-3 and msgtext[j+top].strip()[:4].find('---') > -1:
+            write(config.msg_body_low)
+          elif j+top > msglines-5 and msgtext[j+top].strip()[:4].find('...') > -1:
+            write(config.msg_body_low)
+          elif j+top > msglines-4 and msgtext[j+top].strip()[:4].find('===') > -1:
+            write(config.msg_body_low)
+          elif j+top > msglines-2 and msgtext[j+top].strip()[:2].find('* ') > -1:
+            write(config.msg_body_low)
+
+          write(msgtext[j+top])
+
+        # clear line until end of config.max_body_lines
+        if wherey()==j+start_y:      
+          write(config.msg_body_clearstr)
+
+        j+=1
+
+  return top
+#------------------------------------------------------------------------------
+
+######################################################################################################################
+# Defs
+######################################################################################################################
+
+
+#------------------------------------------------------------------------------
+def drawbackground():
+  write(config.clearscr + config.reader_initscreen)
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def drawtreelist():
+  write(config.mg_initscreen)
+#------------------------------------------------------------------------------
+
+
+################################################################################################################################
+# Treelist 
+################################################################################################################################
+
+#------------------------------------------------------------------------------
+def set_area():
+    global items
+    global actions
+
+    i = 0    
+    selbar = 0
+    top = 0
+    found = False
+
+    # set mbase according to initial (or returning group)
+    while i<len(items) and found == False:
+      if items[i]['type'] != 'group':        
+        if (items[i]['new'] != 0 and 'NEW' in actions) or ('NEW' not in actions and int(items[i]["target"]) == int(current_mbase)):
+          #wrinteln(str(actions))
+          selbar = i
+          found = True
+      i += 1
+    
+    #find first area if none was selected
+    if selbar == 0:
+      while items[selbar]['type'] == 'group' and selbar < len(items) - 1:  
+        selbar += 1
+    
+    #adjust top to selbar position
+    if selbar >= config.mg_max_lines:      
+      top = selbar - config.mg_max_lines; 
+
+    #adjust top to end in middle of available space
+    if selbar > (config.mg_max_lines / 2 ):
+      top = selbar - ( config.mg_max_lines / 2 );
+
+    #make sure no gap at bottom
+    if selbar > len(items)-config.mg_max_lines:
+      top = len(items) - config.mg_max_lines
+
+    if top < 0:
+      top = 0
+
+    return selbar, top
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def treelist():
+    global current_mbase
+    global last_msg_num
+    global user
+    global items
+    global msg_count
+    global viewmode
+
+    #search_txt = ''
+    #search_x = 12
+    #search_y = 23
+    #search_cl= 8
+
+    def updatebar(start_pos, index, total, height, vertical=True):
+      
+      if vertical == True:
+
+        for i in range(0,height):
+            pos = mci_adjust_y(start_pos,i)
+            write(pos+config.mg_bar_low)
+        
+        y = 0
+        if total > 0: 
+            y = (index * (height )) // total        
+        pos = mci_adjust_y(start_pos,y)        
+        write(pos+config.mg_bar_high)
+
+
+    if len(items)<1:
+      return -1
+
+    key = ""
+    #value = -1
+    done = False
+
+    start_y     = mci_extract_y(config.mg_startpos)
+    selbar, top = set_area()
+
+    oldtop = -1
+    oldbar = -1
+    redraw = True
+
+    menucmd('NA','Viewing Mailbases')
+
+    while done == False and not shutdown():
+
+        ma_group = items[selbar]['groupid']  
+        if ma_group != -1:
+          menucmd('MG',str(ma_group))
+        
+        if items[selbar]['id'] != config.private_bases[0]:
+          menucmd('MA',str(items[selbar]['id']))
+        
+        user['mbase'] = items[selbar]['id']   
+        current_mbase = items[selbar]['id']   #for when we return
+
+        #should add oldpos/selbar to redraw
+        if oldbar <> selbar or oldtop <> top or redraw == True:
+
+          if redraw == True:
+            drawtreelist()
+            redraw = False
+
+          oldbar = selbar
+          oldtop = top
+
+          #update scrollbar
+          updatebar(config.mg_bar_start, selbar, len(items), config.mg_max_lines)
+
+          y = top
+          while y-top<=config.mg_max_lines - 1:
+
+              pos = mci_adjust_y(config.mg_startpos,y-top)                    
+
+              if y<len(items):
+                  
+                  #set prompt for use in display strings
+                  setpinfo(8, '')        
+                  #if items[y]['type'] == 'mbase':                    
+                  #  if items[y]['subbed'] == 0:
+                  #    if 'ALL' not in actions:
+                  #      setpinfo(8, config.mg_str_unsubbed)        
+                  
+                  setpinfo(1, items[y]['name'])        
+
+                  if items[y]['type'] == 'mbase':                    
+                    if int(items[y]['total']) == 0 or int(items[y]['total']) == -1: # or items[y]['subbed'] == 0: dont hide total count
+                      setpinfo(2, config.mg_no_new)
+                    else:
+                      setpinfo(2, str(items[y]['total']))      
+                        
+                    #only set if more than 0
+                    if int(items[y]['new']) == 0:
+                      setpinfo(3, config.mg_no_new)
+                    else:
+                      if items[y]['subbed'] == 0:                      
+                        #color
+                        color = '|08'
+                        if selbar == y:
+                          color = '|07'
+                        
+                        setpinfo(3, color+str(items[y]['new']))
+                      else:
+                        setpinfo(3, str(items[y]['new']))                      
+
+                  #default display string
+                  s = config.mg_str_area
+
+                  #group display string
+                  if items[y]['type'] == 'group':
+                      s = config.mg_str_group
+
+                  #highlight display string
+                  elif selbar == y:
+                    s = config.mg_str_highlight        
+
+                    #additional messages if we want    
+                    if items[y]['type'] == 'mbase':                        
+                      write(config.mg_totalmsgs)
+                      write(config.mg_newmsgs)
+
+                  setpinfo(9, ' ')        
+                  if items[y]['type'] != 'group':
+                    if items[y]['subbed'] > 0 and items[y]['new'] > 0:            
+                      setpinfo(9, config.mg_str_new)
+                    elif items[y]['subbed'] == 0:
+                      setpinfo(9, config.mg_str_unsubbed)
+
+                      #s = config.mg_str_new+' '+s                    
+
+                  write(pos)
+                  write(s)
+              else:
+                   #fill empty
+                   #need to test this!
+                  write(pos)
+                  write(config.mg_str_empty)
+
+              y += 1            
+
+        #get keypress
+        key, extended = getkey()       
+        if extended:
+      
+          if key == KEY_UP:
+
+              if selbar > 0:
+                selbar=selbar-1    
+              
+              while items[selbar]['type'] == 'group':
+                  selbar -=1
+                  if selbar < 0:
+                    selbar = 1
+                    top = 0
+              if selbar < top:
+                  top = selbar
+                  selbar = top
+
+          elif key == KEY_LEFT:
+              #remember old position
+              tmppos = selbar
+              
+              if selbar > 0:
+                if items[selbar-1]['type'] != 'group':                
+                  while items[selbar-1]['type'] != 'group' and selbar > 0:                    
+                    selbar -= 1  
+                elif selbar > 1:                  
+                  selbar -= 2
+                  while items[selbar]['type'] == 'group' and selbar > 0:  
+                    selbar -= 1
+
+                #return to old position if only groups found
+                if items[selbar]['type'] == 'group':
+                  selbar = tmppos
+
+              #adjust top
+              if selbar <= top and selbar != 0:
+                  top = selbar - 1
+                  selbar = top + 1
+
+          elif key == KEY_RIGHT:
+              #remember old position
+              tmppos = selbar
+              
+              if selbar < len(items) - 1:
+                if items[selbar+1]['type'] != 'group':
+                  while selbar < len(items) - 1 and items[selbar+1]['type'] != 'group':  
+                    selbar += 1  
+
+                elif selbar < len(items) - 2:
+
+                  selbar += 2
+                  while items[selbar]['type'] == 'group' and selbar < len(items) - 1:  
+                    selbar += 1
+
+                #return to old position if only groups found
+                if items[selbar]['type'] == 'group':
+                    selbar = tmppos
+
+              #adjust top
+              if selbar > top + config.mg_max_lines - 1:
+                  top = selbar - config.mg_max_lines + 1
+             
+
+          elif key == KEY_PGUP:
+              selbar = selbar - config.mg_max_lines
+              if selbar < 0:
+                selbar = 0
+              while items[selbar]['type'] == 'group':
+                selbar +=1          
+                
+              top = top - config.mg_max_lines
+              if top < 0:
+                top = 0
+
+          elif key == KEY_PGDN:
+              selbar = selbar + config.mg_max_lines
+              if selbar > len(items)-1:
+                  selbar = len(items)-1
+              top = top+config.mg_max_lines
+              if top > len(items)-config.mg_max_lines:
+                  top = len(items)-config.mg_max_lines
+                  if top < 0:
+                      top = 0
+              if items[selbar]['type'] == 'group' and selbar < len(items) -1:
+                  selbar +=1
+
+              #added if prevent error if someones configuration is really really bad ;)
+              if selbar == len(items) - 1:
+                  while items[selbar]['type'] == 'group' and selbar > 0:
+                      selbar -= 1
+
+
+          elif key == KEY_END:
+              selbar=len(items)-1
+              if len(items)-config.mg_max_lines > 0:
+                  top = len(items)-config.mg_max_lines
+              else:
+                  top = 0
+              if items[selbar]['type'] == 'group':
+                  selbar -=1
+
+              #precaution to avoid incorrect selection if last pos is an group
+              while items[selbar]['type'] == 'group' and selbar > 0:
+                selbar -= 1
+
+          elif key == KEY_HOME:
+              selbar=0
+              top = 0
+              if items[selbar]['type'] == 'group':
+                    selbar +=1
+
+          elif key == KEY_DOWN: 
+              selbar+=1
+              if selbar > len(items)-1:
+                  selbar = len(items)-1
+                  if items[selbar]['type'] == 'group':
+                      selbar -= 1
+              else:
+                  while items[selbar]['type'] == 'group' and selbar < len(items) - 1:
+                      selbar +=1
+                      if selbar-top > config.mg_max_lines - 1:
+                          top += 1
+                  #precaution if last pos is an group
+                  while items[selbar]['type'] == 'group' and selbar > 0:
+                      selbar -= 1
+
+              if selbar-top > config.mg_max_lines - 1:
+                  top += 1
+        
+        else:
+          key = key.upper()          
+          if key == KEY_ENTER:
+              
+              if "AREASELECT" in actions:   
+                done = True
+
+              else:
+                # index messages
+                index_msgs(items[selbar]['id'])
+
+                # initialize last message (first result from function)                
+                last_msg_num = get_last_read_msg_num()
+                
+                #exit if no msgs (check here for when msgs get deleted)
+                if msg_count == 0:    
+
+                  #show dialog and exit
+                  s = config.msg_no_messages.replace('|&1',basename)
+                  msgdialog(' Mail ',s)
+
+                else:
+                  maillist(items[selbar]['id'])
+
+                # reload group/area
+                # count only!
+
+                items = loadmainlist(True)
+                if len(items)==0:
+                  done = True
+                if selbar > len(items) - 1:
+                  selbar = 1
+
+                #update node status
+                menucmd('NA','Viewing Mailbases')
+
+                redraw = True
+
+          elif key == KEY_CTRLA:
+
+              # switch between subscriptions and all bases
+              if viewmode == "ALL":
+                msgdialog(' View ',config.view_sub_str)
+                viewmode = "SUB"
+              else:
+                viewmode = "ALL"
+                msgdialog(' View ',config.view_all_str)
+
+              # reload bases
+              items = loadmainlist(True)
+              if len(items)==0:
+                  done = True
+              
+              # reposition selection bar
+              selbar, top = set_area()
+
+              drawbackground()
+              redraw = True
+
+          elif key == KEY_CTRLN:
+
+              #only use first private for local mail
+              if current_mbase == config.private_bases[0]:
+                menucmd('MW','')
+              else:
+                write('|IF')
+                menucmd('MP','')
+
+              drawbackground()
+              redraw_hdr = True  
+              redraw = True
+
+          if key == KEY_CTRLS:
+
+            write(config.clearscr)
+            menucmd('MS','C')
+            redraw_hdr = True
+            redraw = True
+
+          elif key == KEY_CTRLU:
+
+              if items[selbar]['subbed'] == 1:
+                write_msgbase_subscription(current_mbase, 0)
+                items[selbar]['subbed'] = 0
+                s = config.unsub_from_str.replace('|&1',items[selbar]['name'])
+                msgdialog(' Unsubscribe ',s)
+              elif items[selbar]['subbed'] == 0:
+                write_msgbase_subscription(current_mbase, 1)
+                items[selbar]['subbed'] = 1
+                s = config.sub_to_str.replace('|&1',items[selbar]['name'])
+                msgdialog(' Subscribe ',s)
+              else:
+                msgdialog(' Unsubscribe ',config.no_unsubscribe_str)
+
+              # reload bases
+              items = loadmainlist(True)
+
+              # reposition selection bar
+              selbar, top = set_area()              
+              redraw = True
+
+
+          elif key == KEY_ESCAPE or key == 'Q':
+              done = True
+ 
+          elif key == 'H':    
+              write('|07|16|CL')
+
+              showfile(rjamdir+'groups_help.ans',0,False,False,False)
+
+              gotoxy(1,24)
+              pause(True)
+
+              redraw = True
+      #------------------------------------------------------------------------------
+
+
+################################################################################################################################
+# Mail list
+################################################################################################################################
+
+
+#------------------------------------------------------------------------------
+def maillist(mbaseid):
+  global last_msg_num
+  global msgtext
+  global basename
+  global msg_count
+  global debug
+  global msg_lastID
+  global user
+  global actions
+  global msgbase #to close msgbase on leaving the mail list
+ 
+  menucmd('NA','Reading Messages')
+
+  #msg_hdr_line_mod = 0
+
+  top_body  = 0
+  top       = 0
+  selbar    = -1
+  done      = False
+  start_y   = mci_extract_y(config.hdr_startpos)
+  msgtext   = None
+  msglines  = 0
+  echohdr   = False
+
+  count = 0
+
+  if last_msg_num > 0:
+    while selbar == -1 and count < msg_count:
+      if msgs[count]['msg_number'] > last_msg_num:
+        if (user['mbase'] not in config.private_bases and 'YOU' not in actions) or ((user['mbase'] in config.private_bases or 'YOU' in actions) and (user["handle"].upper() == msgs[count]['msg_to'].upper() or user["name"].upper() == msgs[count]['msg_to'].upper())):
+          selbar = count
+          top = selbar
+          break
+    
+      count += 1
+  else:
+    selbar = 0
+
+  #start at end if no lastread message found
+  if selbar == -1:
+    selbar = msg_count-1
+    top = msg_count-config.max_header_lines-1
+
+  #make sure no gap at bottom
+  elif selbar > msg_count-config.max_header_lines - 1:
+    top = msg_count - config.max_header_lines - 1
+
+  #adjust top if necessary
+  if top<0:
+    top = 0
+
+  
+  drawbackground()
+
+  write(mci_adjust_y(config.msg_body_startpos,-2))
+  write(config.mid_first)
+  write(mci_adjust_y(config.msg_body_startpos,-1))
+  write(config.mid_second)
+
+  redraw_hdr = True
+
+  # MAIN LOOP
+
+  while done == False and start_y != -1 and not shutdown() and msg_count > 0:
+    
+    y = top  
+
+    # draw message headers  
+    if redraw_hdr == True:
+
+      while y-top<=config.max_header_lines: #+msg_hdr_line_mod: 
+
+        pos = mci_adjust_y(config.hdr_startpos,y-top)      
+        write(pos)
+
+        if y<msg_count:                  
+          msg = msgs[y]
+        
+          if selbar == y:    
+            s = config.hdr_str_selected        
+          else:
+            s = config.hdr_str      
+          
+          if selbar == y:
+            setpinfo(8, '|08'+chr(250))
+          else:  
+            setpinfo(8, ' ')
+          setpinfo(9, '')  #was used for readbit
+
+          if last_msg_num < msgs[y]['msg_number']:
+            
+            if ('YOU' not in actions and user['mbase'] not in config.private_bases) or (user["handle"].upper() == msgs[y]['msg_to'].upper() or user["name"].upper() == msgs[y]['msg_to'].upper()):
+              if selbar != y:    
+                s = config.hdr_str_new
+              setpinfo(8, '|14*')
+            else:
+              #setpinfo(8, '|05>')
+              setpinfo(8, ' ')
+                  
+          setpinfo(1, msg['msg_subject'])        
+          setpinfo(2, msg['msg_from'])
+          setpinfo(3, msg['msg_to'])
+          setpinfo(4, msg['msg_date'])
+
+          write(s)
+        else:
+          s = config.hdr_str      
+          setpinfo(1, '')        
+          setpinfo(2, '')
+          setpinfo(3, '')
+          setpinfo(4, '         ')
+          setpinfo(8, '')
+          setpinfo(9, '')
+          write(s)
+          
+        y += 1    
+
+
+      top_body = 0    
+      redraw_hdr = False  
+      msgtext = None
+
+
+    top_body = draw_msg_body(msgs[selbar],selbar,top_body,False,echohdr)
+
+    key, extended = getkey()
+    key = key.upper()
+
+    if extended:    
+
+      if key == KEY_UP:
+        redraw_hdr = True      
+        selbar -= 1
+
+        if selbar < 0:
+            selbar = 0
+            if not load_prevmsg(msgs[selbar]['msg_number']):
+              redraw_hdr = False
+
+        if selbar < top:
+            top = selbar    
+
+      elif key == KEY_DOWN:
+        redraw_hdr = True      
+        selbar += 1
+
+        if selbar >= msg_count: 
+            selbar = msg_count-1
+            if load_nextmsg(msgs[selbar]['msg_number']):
+              selbar = msg_count-1
+              top += 1
+            else:  
+              redraw_hdr = False
+            
+
+        elif selbar > top+config.max_header_lines: 
+            top += 1
+
+      elif key == KEY_LEFT:
+          top_body -= 1
+
+      elif key == KEY_RIGHT:
+          top_body += 1
+
+      elif key == KEY_PGUP:
+        redraw_hdr = True
+        selbar = selbar - config.max_header_lines - 1
+        if selbar < 0:
+            for i in range(0, selbar, -1):
+              selbar = 0
+              load_prevmsg(msgs[selbar]['msg_number'])
+            
+            selbar = 0
+            top = 0
+        else:
+            top = top - (config.max_header_lines) - 1
+            if top < 0:
+                top = 0
+
+      elif key == KEY_PGDN:
+        redraw_hdr = True
+        selbar = selbar+config.max_header_lines + 1
+        if selbar > msg_count - 1:
+            for i in range(msg_count - 1, selbar, 1):
+              selbar = msg_count - 1
+              if load_nextmsg(msgs[selbar]['msg_number']):
+                  selbar = msg_count-1
+                  top += 1
+        
+        top = top+(config.max_header_lines) + 1
+        
+        if top > msg_count-1-(config.max_header_lines):
+            top = msg_count-1-(config.max_header_lines)
+            if top < 0:
+                top = 0
+
+      elif key == KEY_END:
+        
+        get_msgs( msg_lastID )
+
+
+        redraw_hdr = True
+        selbar=msg_count-1
+        if msg_count-config.max_header_lines-1 > 0:
+            top = msg_count-(config.max_header_lines)-1
+        else:
+            top = 0
+
+      elif key == KEY_HOME:
+        get_msgs(0)
+        redraw_hdr = True
+        selbar = 0
+        top = 0
+                
+    else:
+
+      if key == 'P':
+
+        if debug == True:
+          debug = False
+        else:
+          debug = True
+
+      if key == KEY_ESCAPE or key == 'Q':
+        clrscr()
+        done = True
+
+      if key == 'K':
+
+        if echohdr == False:
+          echohdr = True
+        else:
+          echohdr = False
+
+        redraw_hdr = True
+       
+      if key == 'R':
+
+        draw_msg_body(msgs[selbar],selbar,0,True) #dump message quote
+
+        if last_msg_num < msgs[selbar]['msg_number']:
+          last_msg_num = write_last_read_msg_num(msgs[selbar]['msg_number'],False)
+          
+        to = msgs[selbar]['msg_from']
+        to = to.replace(' ','_')  #spaces bug the response..
+
+        subject = msgs[selbar]['msg_subject']
+        subject = subject.replace(' ','_')  #spaces bug the response..
+
+
+        if basename == "EMAIL":                  
+          menucmd('MW','/to:'+to+' /subj:'+subject)
+        else:
+          #stuffkey(subject+chr(13))
+          #MSGID 21:4/110 xxxxxx
+          #INTL 21:3/126 21:4/110 second number is target email first number is opicron
+          #       ^ OPI     ^ REPLY TO
+          #/ADDR - kludge
+          #MSGID
+          menucmd('MP','/to:'+to+' /subj:'+subject)
+
+        redraw_hdr = True
+        drawbackground()
+
+      elif key == KEY_ENTER:
+
+        if last_msg_num < msgs[selbar]['msg_number']:
+          last_msg_num = write_last_read_msg_num(msgs[selbar]['msg_number'],False)          
+        #else:
+        #  last_msg_num = write_last_read_msg_num(msgs[selbar]['msg_number']-1, True)
+        redraw_hdr = True   
+
+      elif key == 'N':
+
+          #only use first private for local mail
+          if mbaseid == config.private_bases[0]:
+            menucmd('MW','')
+          else:
+            write('|IF')
+            menucmd('MP','')
+
+          drawbackground()
+          redraw_hdr = True      
+
+      elif key == '[':
+          if config.max_header_lines > 1:
+            config.max_header_lines -= 1
+            config.msg_body_startpos = mci_adjust_y(config.msg_body_startpos,-1)
+            config.max_body_lines += 1
+
+            if selbar > top + config.max_header_lines:
+              top += 1
+
+            if selbar < 0:
+              top += 1
+      
+            redraw_hdr = True
+
+            write(mci_adjust_y(config.msg_body_startpos,-2))
+            write(config.mid_first)
+            write(mci_adjust_y(config.msg_body_startpos,-1))
+            write(config.mid_second)
+      
+      elif key == ']':
+          if config.max_header_lines < 10:
+            config.max_header_lines += 1
+            config.msg_body_startpos = mci_adjust_y(config.msg_body_startpos, 1)
+            config.max_body_lines += -1
+          
+            if top > 0 and top < config.max_header_lines:
+              top -= 1
+            elif top > msg_count - config.max_header_lines - 1 and msg_count > config.max_header_lines:
+              top -= 1
+      
+            redraw_hdr = True
+
+            write(mci_adjust_y(config.msg_body_startpos,-2))
+            write(config.mid_first)
+            write(mci_adjust_y(config.msg_body_startpos,-1))
+            write(config.mid_second)
+
+
+      elif key == 'S':
+
+          last_msg_num = write_last_read_msg_num(msgs[selbar]['msg_number']-1, True)
+          redraw_hdr = True
+          
+      elif key == 'D':
+          
+          #only allow delete of send and received messages
+          if issysop() or (user['mbase'] in config.private_bases and msgs[selbar]['msg_to'].upper() == user['handle'].upper() or msgs[selbar]['msg_from'].upper() == user['handle'].upper() or msgs[selbar]['msg_to'].upper() == user['name'].upper() or msgs[selbar]['msg_from'].upper() == user['name'].upper()):
+
+            delete_msg_num(selbar, msgs[selbar])
+
+            s = config.delete_msg
+            msgdialog(' Delete ',s)
+
+            del(msgs[selbar])
+            msg_count = len(msgs)
+
+            #make sure we dont go out of bounds
+            if selbar > msg_count - 1:
+              selbar = msg_count - 1
+              top -= 1
+            if top < 0:
+              top = 0
+
+            redraw_hdr = True
+
+  msg_close(msgbase)
+
+#------------------------------------------------------------------------------
+
+
+######################################################################################################################
+# MAIN
+######################################################################################################################
+
+
+#------------------------------------------------------------------------------
+cfg           = getcfg()   
+user          = getuser(0) 
+
+current_mbase = user['mbase']
+file          = ""
+msg_count     = 0
+sysop_level   = int(re.findall(r'\d+', cfg['sysopacs'])[0])
+viewmode      = "SUB"
+
+actions = []
+
+i = 1
+while i <= param_count():
+  arg = param_str(i).upper()  
+
+  if arg == "/YOU":
+    actions.append('YOU')
+
+  #could be done with menu command and then list
+  elif arg == "/EMAIL":
+    actions.append('EMAIL')
+
+  #elif arg == "/NETMAIL":
+  #  actions.append('NETMAIL')
+
+  elif arg == "/MAILLIST":
+    actions.append('MAILLIST')
+
+  elif arg == "/AREASELECT":
+    actions.append('AREASELECT')
+
+  elif arg == "/NEW":
+    actions.append('NEW')
+
+  elif arg == "/ALL":
+    actions.append('ALL')
+    viewmode = "ALL"
+
+  #not implemented yet - split or full message reader  
+  #elif arg == "/SPLIT":
+  #  actions.append('SPLIT')
+
+  elif arg == "/CHANGEAREA":
+    actions.append('CHANGEAREA')
+    arg = param_str(i+1)
+    if arg == "-":
+      actions.append('BACKWARD')
+    elif arg == "+":
+      actions.append('FORWARD')
+    i += 1
+
+  i += 1
+
+if 'CHANGEAREA' in actions:
+  get_mailbases()
+  get_subscriptions()
+
+  res = []
+  for i in range(len(mailbases)):
+    if mailbases[i]['subbed'] > 0:
+      res.append(mailbases[i])
+
+  for i in range(len(res)):
+      
+      if res[i]['id'] == current_mbase:
+
+        next = i
+        if "BACKWARD" in actions:
+          next -= 1
+        elif "FORWARD" in actions:
+          next += 1     
+
+        if next < 0:
+          next = len(res)-1
+        elif next > len(res)-1:
+          next = 0
+
+        if res[next]['groupid'] != -1:
+          menucmd('MG',str(res[next]['groupid']))
+        menucmd('MA',str(res[next]['id'])) 
+
+else:
+
+  if "MAILLIST" in actions or "EMAIL" in actions:  
+
+    #private localmail
+    if "EMAIL" in actions:            
+      index_msgs(config.private_bases[0])
+      last_msg_num = get_last_read_msg_num()
+      maillist(config.private_bases[0])
+
+    #current mailarea
+    else:      
+      index_msgs(user['mbase'])
+      last_msg_num = get_last_read_msg_num()
+      
+      if msg_count == 0:    
+        s = config.msg_no_messages.replace('|&1',basename)
+        msgdialog(' Mail ',s)          #show dialog and exit
+
+      else:
+        maillist(user['mbase'])
+      
+  else:
+    # group/area choice
+    items = loadmainlist()
+    if len(items) > 0:
+      treelist()
+
+#------------------------------------------------------------------------------
+
+######################################################################################################################

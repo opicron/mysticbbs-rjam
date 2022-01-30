@@ -18,4 +18,14 @@ External mail group/area looper
 * shows new/total mail count    
 * smart quote highlighter       
 * auto selects current area     
-* follows mystic config         
+* follows mystic config      
+
+
+
+![mailread0](https://user-images.githubusercontent.com/472432/151710794-e1203d0a-a1b8-423f-bcae-49fa12922e55.JPG)
+
+![mailread1](https://user-images.githubusercontent.com/472432/151710803-81bbd59c-85cf-4309-921c-508ccaf8637e.JPG)
+
+![mailread2](https://user-images.githubusercontent.com/472432/151710804-0612c0ef-9b8a-4fc2-8a17-91d5eba0db8b.JPG)
+
+![areaswitcher](https://user-images.githubusercontent.com/472432/151710814-b991f3c1-307e-4197-a2ab-099bb10418f1.JPG)

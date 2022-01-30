@@ -1,1 +1,133 @@
 
+###################################################################################################################
+# rJAM Configuration
+###################################################################################################################
+
+
+#------------------------------------------------------------------------------
+
+# set private base ids like email, netmail etc used to determine functionality
+# who can see which email (privacy!) very important to set correctly
+# important:
+#           first area ID is used for LOCAL PRIVATE EMAIL - dont use an netmail area for first id
+#           all other id's are assumed to be PRIVATE NETMAIL
+# note:
+#           other local areas do not need to be defined! only private email area ID needs to be defined!
+
+private_bases  = [1]   	
+#private_bases  = [1,xx,xx,xx] #xx = area IDs of netmail areas   	
+
+# date format
+datetimefmt = "%d %b %y" #DATETIMEFMT = "%Y-%m-%d %H:%M:%S"
+
+# replacements for message body
+rep = {"|PN": ":PN", "|PA": ":PA", "|CL": ":CL"} 
+#------------------------------------------------------------------------------
+
+clearscr = '|07|16|CL'
+#------------------------------------------------------------------------------
+
+###################################################################################################################
+# Group/Area config
+###################################################################################################################
+
+#------------------------------------------------------------------------------
+#group/area display strings
+
+# |$1 = group/area name
+# |$2 = total messages
+# |$3 = new messages
+# |$8 = unsubbed mofidier
+# |$9 = marked new modifier
+
+mg_initscreen     = '|16|CL|[X01|[Y07|[K|[Y08|[K|[Y09|[K|[Y10|[K|[Y11|[K|[Y12|[K|[Y13|[K|[Y14|[K|[Y15|[K|[Y16|[K|[Y17|[K|[Y18|[K|[Y19|[K|[Y20|[K|[Y21|[K|[Y22|[K|[Y23|[K|[Y24|[K|[Y01|[X01|DFmsggroups.ans|'
+mg_startpos       = '|[X22|[Y09'
+mg_max_lines      = 12
+mg_str_group      = '|16|08|$T39|&1 |$X58:'
+mg_str_area       = '|16|&9|&8|07|$T24|&1|$X48 |[X48|14|$L04|&3|$X53  |07|$L04|&2|$X58  '    #truncated name and right justified count
+mg_str_highlight  = '|19|&9|&8|15|$T24|&1|$X48 |[X48|14|$L04|&3|$X53  |15|$L04|&2|$X58 |16 ' #truncated name and right justified count
+mg_str_empty      = '|16|$X58  '
+
+mg_str_unsubbed   = '|05>'
+mg_str_new        = '|14*'
+mg_no_new         = '|08'+chr(250)
+
+#group/area display position bar
+mg_bar_start     = '|[X60|[Y09'
+mg_bar_low       = '|16|08'+chr(176)
+mg_bar_high      = '|16|11'+chr(178)
+
+
+#group/area statistics
+
+#if you want the current total and new message vars shown elsewhere use these
+#see groups-seperated-vars.ans for example..
+#mg_totalmsgs      = "|[X36|[Y06|08|16|$D10:|[X36|[Y06|15|&2"
+#mg_newmsgs        = "|[X31|[Y07|08|16|$D05:|[X31|[Y07|15|&3"
+
+mg_totalmsgs      = ""
+mg_newmsgs        = ""
+
+no_unsubscribe_str = "Can't unsubscribe from mandatory area"
+unsub_from_str     = "Unsubscribed from |&1"
+sub_to_str         = "Subscribed to |&1"
+
+view_all_str       = 'All message bases'
+view_sub_str       = 'Subscribed message bases'
+#------------------------------------------------------------------------------
+
+###################################################################################################################
+# Message reader config
+###################################################################################################################
+
+#------------------------------------------------------------------------------
+#msg header
+reader_initscreen = '|DFreader.ans|'
+
+max_header_lines  = 4
+hdr_startpos      = '|[X01|[Y03|16'
+
+# |$1 = subject
+# |$2 = from
+# |$3 = to
+# |$8 = new
+# |$9 = unread
+
+#due to an bug(?) in |$X## which doesnt work if we are one char before the number we do manual fill
+hdr_str           = '|11| |&8|16|08|$T32|&1|$X38 |[X38|08|08|$T15|&2 |$X54 |[X54|08|08|&9|08|$T15|&3|$X69 |[X69|08|08|$T09|&4|[X78 |16 |08|'
+hdr_str_new       = '|11| |&8|16|07|$T32|&1|$X38 |[X38|08|07|$T15|&2 |$X54 |[X54|08|07|&9|07|$T15|&3|$X69 |[X69|08|07|$T09|&4|[X78 |16 |08|'
+
+#config.hdr_str_selected  = '|19|15 |&8|15|$T30|&1|$X34 |08|15|&2|$X50 |08|15|&9|15|$T12|&3|$X66 |08|15|&4|$X77 |16'
+hdr_str_selected  = '|11| |&8|16|15|$T32|&1|08|$X38'+chr(250)+'|[X38|15|$T15|&2|08'+chr(250)+'|$X54'+chr(250)+'|[X54|15|&9|15|$T15|&3|08|$X69'+chr(250)+'|[X69|15|$T09|&4|08|[X78'+chr(250)+'|16 |08|'
+
+#unread bit set in message (used for local email/netmail(?))
+hdr_str_unread    = '|05>'
+
+hdr_clearstr      = ' |$X77 '
+#config.hdr_clearstr      =  '|16|15 |15|$X34 |08||15|$X50 |08||15|15|$X66 |08||15|$X77  |16'
+
+hdr_bar_start     = '|[X79|[Y03'
+hdr_bar_low       = '|16|08'+chr(176)
+hdr_bar_high      = '|16|11'+chr(178)
+#------------------------------------------------------------------------------
+
+mid_first       = "|16|03`------------------------------------------------------------------------------'"
+mid_second      = "|16|13::|05::                                                                        |05::|13::"
+
+
+#------------------------------------------------------------------------------
+#msg body
+max_body_lines            = 13
+msg_body_startpos         = '|[X01|[Y10'
+msg_body_clearstr         = '|16|[K'
+msg_body_default          = '|09'
+msg_body_quote_highlight  = '|05'
+msg_body_low              = '|08'
+
+body_bar_start            = '|[X71|[Y23'
+
+msg_no_messages           = 'No messages in |&1 base found.' #|&1 base name
+dialog_text_str           = '|15|23|&9|16' #|&9 is the displayed text
+dialog_press_any_key      = '|15|23 [press any key]'
+delete_msg                = 'Message removed.'
+#------------------------------------------------------------------------------

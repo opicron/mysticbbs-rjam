@@ -1,5 +1,7 @@
 # rJAM splitscreen message reader for MysticBBS A46+ 
 
+!! READ THE README.TXT BEFORE INSTALL !!
+
 Split screen message reader     
 Visual group/area switcher      
 External mail group/area looper 

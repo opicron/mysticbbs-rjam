@@ -1,5 +1,4 @@
-# mysticbbs-rja
-#rJAM splitscreen message reader for MysticBBS A46+ 
+# rJAM splitscreen message reader for MysticBBS A46+ 
 
 Split screen message reader     
 Visual group/area switcher      

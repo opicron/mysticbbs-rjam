@@ -858,7 +858,7 @@ def processmsg(msghdr):
 
   msg = dict()
 
-  if msghdr['deleted'] == False:
+  if msghdr['deleted'] == False and msghdr['from'] != '':
   
     add = True
 

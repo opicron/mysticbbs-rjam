@@ -2082,6 +2082,7 @@ def maillist(mbaseid):
 
           subject = msgs[selbar]['msg_subject']
           subject = subject.replace(' ','_')  #spaces bug the response..
+          to = to.replace(' ','_')  #spaces bug the receiver..
           subject = subject.replace('/F','\F')  #/F is seen as /FORCED no matter what
 
           if subject.find('Re:_') == 0:

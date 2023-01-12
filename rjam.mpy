@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # rjam.py
-# v0.14
+# v0.15
 #
 #
 # !:
@@ -554,7 +554,9 @@ def get_mailbases():
             if mb != None:
 
               if 'EMAILNETMAIL' in actions:
-                if mb['id'] not in config.private_bases:
+                #if mb['id'] not in config.private_bases:
+                #double check! if we only mean netmail and email
+                if mb['nettype'] == 1:
                   j += 1
                   continue
 
@@ -592,9 +594,10 @@ def get_new_mail_count():
     base = mailbases[i]
     mailbase = getmbaseid(base['id'])
       
+    #logerror(str(mailbase))
     #set this to make sure get_msgs knows what to do
     user['mbase'] = base['id']
-  
+
     new = 0    
     total = 0
 
@@ -614,12 +617,15 @@ def get_new_mail_count():
     total, new, yours, lastpost = msg_stats(msgbase)
 
     if 'YOU' in actions:
-      if base['id'] in config.private_bases:
-        mailbases[i]['total'] = total
+      #if base['id'] in config.private_bases:
+      if mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
+        mailbases[i]['total'] = total-yours+new
+        #yours is incorrect (bug of mystic?)
       else:
         mailbases[i]['total'] = -1
       mailbases[i]['new'] = yours
-    elif base['id'] in config.private_bases:
+    #elif base['id'] in config.private_bases:
+    elif mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
       mailbases[i]['total'] = total
       mailbases[i]['new'] = yours
     else:
@@ -885,6 +891,7 @@ def write_msgbase_subscription(mbaseid, newscan):
 def processmsg(msghdr):
   global user
   global actions
+  global mailbase
 
   msg = dict()
 
@@ -896,7 +903,10 @@ def processmsg(msghdr):
       add = True
 
     #email/private areas
-    if user['mbase'] in config.private_bases:
+    mailbase = getmbaseid(user['mbase'])
+    
+    #if user['mbase'] in config.private_bases:
+    if mailbase['nettype'] == 0:
         add = False
 
         #both from/to name/handle are added
@@ -1093,7 +1103,8 @@ def index_msgs(mbaseid,index=-1):
       return
     
     #this could cause issues if private base has some extended acs requirements
-    if access(base['listacs']) or mbaseid in config.private_bases:
+    #if access(base['listacs']) or mbaseid in config.private_bases:
+    if access(base['listacs']) or base['nettype'] == 0:
       msgbase = msg_open(file)
       get_msgs(index)
 #------------------------------------------------------------------------------
@@ -1437,7 +1448,7 @@ def treelist():
         if ma_group != -1:
           menucmd('MG',str(ma_group))
         
-        if items[selbar]['id'] != config.private_bases[0]:
+          #if items[selbar]['id'] != config.private_bases[0]:
           menucmd('MA',str(items[selbar]['id']))
         
         user['mbase'] = items[selbar]['id']   
@@ -1693,9 +1704,12 @@ def treelist():
           elif key == KEY_CTRLN:
 
               #only use first private for local mail
-              if current_mbase == config.private_bases[0]:
+              mailbase = getmbaseid(current_mbase)
+              if mailbase['nettype'] == 0:
+                #if current_mbase == config.private_bases[0]:
                 menucmd('MW','')
-              else:
+              elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1:
+                #netmail nettype == 3
                 write('|IF')
                 menucmd('MP','')
 
@@ -1817,10 +1831,19 @@ def maillist(mbaseid):
 
   count = 0
 
+  private_base = False
+  mailbase = getmbaseid(current_mbase)
+  if mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
+    private_base = True
+
+  #logerror('test')
+  #logerror(str(msgbase))
+
   if last_msg_num > 0:
     while selbar == -1 and count < msg_count:
       if msgs[count]['msg_number'] > last_msg_num:
-        if (user['mbase'] not in config.private_bases and 'YOU' not in actions) or ((user['mbase'] in config.private_bases or 'YOU' in actions) and (user["handle"].upper() == msgs[count]['msg_to'].upper() or user["name"].upper() == msgs[count]['msg_to'].upper())):
+        #if (user['mbase'] not in config.private_bases and 'YOU' not in actions) or ((user['mbase'] in config.private_bases or 'YOU' in actions) and (user["handle"].upper() == msgs[count]['msg_to'].upper() or user["name"].upper() == msgs[count]['msg_to'].upper())):
+        if (not private_base and 'YOU' not in actions) or ((private_base or 'YOU' in actions) and (user["handle"].upper() == msgs[count]['msg_to'].upper() or user["name"].upper() == msgs[count]['msg_to'].upper())):
           selbar = count
           top = selbar
           break
@@ -1882,7 +1905,8 @@ def maillist(mbaseid):
 
           if last_msg_num < msgs[y]['msg_number']:
             
-            if ('YOU' not in actions and user['mbase'] not in config.private_bases) or (user["handle"].upper() == msgs[y]['msg_to'].upper() or user["name"].upper() == msgs[y]['msg_to'].upper()):
+            #if ('YOU' not in actions and user['mbase'] not in config.private_bases) or (user["handle"].upper() == msgs[y]['msg_to'].upper() or user["name"].upper() == msgs[y]['msg_to'].upper()):
+            if ('YOU' not in actions and not private_base) or (user["handle"].upper() == msgs[y]['msg_to'].upper() or user["name"].upper() == msgs[y]['msg_to'].upper()):
               if selbar != y:    
                 s = config.hdr_str_new
               setpinfo(8, '|14*')
@@ -2040,10 +2064,11 @@ def maillist(mbaseid):
         subject = subject.replace(' ','_')  #spaces bug the response..
         subject = subject.replace('/F','\F')  #/F is seen as /FORCED no matter what
 
-        if basename == "EMAIL":
+        #if basename == "EMAIL":
+        if mailbase['nettype'] == 0:
           #if user['mbase'] in config.private_bases:                  
           menucmd('MW','/to:'+to+' /subj:'+subject)
-        else:
+        elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1:
           msgtext = get_msg_body(selbar, msgs[selbar],True)
           msgtext = multiple_replace(msgtext, config.rep)
           msgtext = utf_to_ascii( msgtext )
@@ -2091,10 +2116,11 @@ def maillist(mbaseid):
           if subject.find('Fw:') == -1:
             subject = 'Fw:_'+subject
 
-          if basename == "EMAIL":
+          #if basename == "EMAIL":
+          if mailbase['nettype'] == 0:
             #if user['mbase'] in config.private_bases:                  
             menucmd('MW','/to:'+to+' /subj:'+subject)
-          else:
+          elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1:
             write('|CL')
             menucmd('MP','/to:'+to+' /subj:'+subject+' /addr: ')
 
@@ -2112,14 +2138,20 @@ def maillist(mbaseid):
       elif key == 'N':
 
           #only use first private for local mail
-          if mbaseid == config.private_bases[0]:
+          if mailbase['nettype'] == 0:
+            #if mbaseid == config.private_bases[0]:
             menucmd('MW','')
-          else:
+          elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1:
             write('|IF')
             menucmd('MP','')
 
           drawbackground()
-          redraw_hdr = True      
+
+          #load new message at end of 
+          load_nextmsg(msgs[len(msgs)-1]['msg_number'])
+          
+          redraw_hdr = True    
+          redraw = True 
 
       elif key == '[':
           if config.max_header_lines > 1:
@@ -2167,7 +2199,12 @@ def maillist(mbaseid):
       elif key == 'D':
           
           #only allow delete of send and received messages
-          if issysop() or (user['mbase'] in config.private_bases and msgs[selbar]['msg_to'].upper() == user['handle'].upper() or msgs[selbar]['msg_from'].upper() == user['handle'].upper() or msgs[selbar]['msg_to'].upper() == user['name'].upper() or msgs[selbar]['msg_from'].upper() == user['name'].upper()):
+          private_base = False
+          if mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
+            private_base = True
+
+          #if issysop() or (user['mbase'] in config.private_bases and msgs[selbar]['msg_to'].upper() == user['handle'].upper() or msgs[selbar]['msg_from'].upper() == user['handle'].upper() or msgs[selbar]['msg_to'].upper() == user['name'].upper() or msgs[selbar]['msg_from'].upper() == user['name'].upper()):
+          if issysop() or (private_base and msgs[selbar]['msg_to'].upper() == user['handle'].upper() or msgs[selbar]['msg_from'].upper() == user['handle'].upper() or msgs[selbar]['msg_to'].upper() == user['name'].upper() or msgs[selbar]['msg_from'].upper() == user['name'].upper()):
 
             delete_msg_num(selbar, msgs[selbar])
 
@@ -2253,8 +2290,12 @@ while i <= param_count():
 
   i += 1
 
+#moved from if block
+get_mailbases()
+
 if 'CHANGEAREA' in actions:
-  get_mailbases()
+  #moved up to make sure that the following else block can read through mailbases
+  #get_mailbases()
   get_subscriptions()
 
   res = []
@@ -2286,10 +2327,21 @@ else:
   if "MAILLIST" in actions or "EMAIL" in actions:  
 
     #private localmail
-    if "EMAIL" in actions:            
-      index_msgs(config.private_bases[0])
-      last_msg_num = get_last_read_msg_num()
-      maillist(config.private_bases[0])
+    if "EMAIL" in actions: 
+
+      #try to find email base (localmail)
+      for i in range(len(mailbases)):
+        if mailbases[i]['nettype'] == 0:           
+          index_msgs(mailbases[i]['id'])
+          last_msg_num = get_last_read_msg_num()
+          maillist(mailbases[i]['id'])
+          break
+          
+
+
+      #index_msgs(config.private_bases[0])
+      #last_msg_num = get_last_read_msg_num()
+      #maillist(config.private_bases[0])
 
     #current mailarea
     else:      

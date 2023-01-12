@@ -890,8 +890,8 @@ def write_msgbase_subscription(mbaseid, newscan):
 
 def processmsg(msghdr):
   global user
-  global actions
   global mailbase
+  global actions
 
   msg = dict()
 
@@ -901,10 +901,7 @@ def processmsg(msghdr):
       add = False
     else:
       add = True
-
-    #email/private areas
-    mailbase = getmbaseid(user['mbase'])
-    
+   
     #if user['mbase'] in config.private_bases:
     if mailbase['nettype'] == 0:
         add = False
@@ -942,6 +939,7 @@ def processmsg(msghdr):
 
 #------------------------------------------------------------------------------
 def load_prevmsg(index):
+    global user
     global file
     global msgs
     global msg_count
@@ -1405,6 +1403,7 @@ def treelist():
     global items
     global msg_count
     global viewmode
+    global mailbase
 
     #search_txt = ''
     #search_x = 12
@@ -1650,6 +1649,8 @@ def treelist():
                 done = True
 
               else:
+                mailbase = getmbaseid(items[selbar]['id'])
+
                 # index messages
                 index_msgs(items[selbar]['id'])
 
@@ -1815,7 +1816,8 @@ def maillist(mbaseid):
   global user
   global actions
   global msgbase #to close msgbase on leaving the mail list
- 
+  global mailbase
+   
   menucmd('NA','Reading Messages')
 
   #msg_hdr_line_mod = 0
@@ -1832,7 +1834,7 @@ def maillist(mbaseid):
   count = 0
 
   private_base = False
-  mailbase = getmbaseid(current_mbase)
+  mailbase = getmbaseid(mbaseid)
   if mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
     private_base = True
 
@@ -2242,6 +2244,7 @@ file          = ""
 msg_count     = 0
 sysop_level   = int(re.findall(r'\d+', cfg['sysopacs'])[0])
 viewmode      = "SUB"
+mailbase      = False
 
 actions = []
 
@@ -2336,7 +2339,7 @@ else:
           last_msg_num = get_last_read_msg_num()
           maillist(mailbases[i]['id'])
           break
-          
+
 
 
       #index_msgs(config.private_bases[0])

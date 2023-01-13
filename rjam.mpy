@@ -895,11 +895,11 @@ def processmsg(msghdr):
 
   msg = dict()
 
+  add = False
+
   if msghdr['deleted'] == False and msghdr['from'] != '':
   
-    if "NEW" in actions:
-      add = False
-    else:
+    if "NEW" not in actions:
       add = True
    
     #if user['mbase'] in config.private_bases:
@@ -920,8 +920,8 @@ def processmsg(msghdr):
         if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper():
           add = True 
       else:
-        if user["handle"].upper() != msghdr['to'].upper() and user["name"].upper() != msghdr['to'].upper() and user["handle"].upper() != msghdr['from'].upper() and user["name"].upper() != msghdr['from'].upper():
-          add = False
+        if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper() or user["handle"].upper() == msghdr['from'].upper() or user["name"].upper() == msghdr['from'].upper():
+          add = True
 
     if add == True:
 
@@ -939,7 +939,6 @@ def processmsg(msghdr):
 
 #------------------------------------------------------------------------------
 def load_prevmsg(index):
-    global user
     global file
     global msgs
     global msg_count

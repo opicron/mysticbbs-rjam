@@ -36,6 +36,9 @@
 # add group/area looper
 # add dynamic message read (only read few messages instead of whole base!)
 # better quote highlight, if first trimmed char (within 3 char pos) is a >
+# mark all areas as read
+# mark area as read
+# get private status from messagebase to avoid ==private_bases!
 
 
 # todo:
@@ -43,12 +46,8 @@
 # add default bg/fg to ans2str
 # why is first character lost when ans2str regular text
 # better ansi determination regular expression
-
 # implement subject only screen (instead of resizing msg hdrs)
-# mark all areas as read
-# mark area as read
 # check if config.py exists
-# get private status from messagebase to avoid ==private_bases!
 # split long desc text by word instead of 80 chars 
 # add functionality for larger message width (132), keep 80 for ansi!
 
@@ -72,7 +71,7 @@ from ans2str import *                         # ansi2mci parser
 import config                                 # configuration
 
 # make sure default settings are loaded
-if not hasattr(config, 'private_bases'):          config.private_bases     = [1]   	
+#if not hasattr(config, 'private_bases'):          config.private_bases     = [1]   	
 if not hasattr(config, 'datetimefmt'):            config.datetimefmt       = "%d %b %y" #DATETIMEFMT = "%Y-%m-%d %H:%M:%S"
 if not hasattr(config, 'rep'):                    config.rep               = {"|PN": ":PN", "|PA": ":PA", "|CL": ":CL"} 
 if not hasattr(config, 'clearscr'):               config.clearscr          = '|07|16|CL'
@@ -436,7 +435,6 @@ def updatebar(start_pos, index, total, height, vertical=True):
         pos = mci_adjust_x(start_pos,i)  
         write(pos+config.hdr_bar_high)   
         i += 1
-
 #------------------------------------------------------------------------------
 
 
@@ -690,7 +688,7 @@ def get_subscriptions():
       return
     
     file = mailbase['path']+mailbase['filename'] #no extension
-    basename = mailbase['filename'].upper()
+    #basename = mailbase['filename'].upper()
 
     mailbases[i]['subbed'] = read_msgbase_subscription(base['id'], file)[0]
 #------------------------------------------------------------------------------
@@ -719,6 +717,7 @@ def loadmainlist(count=False):
 
       count = 0        
       areas = []    
+
       #loop areas
       for j in range(len(mailbases)):
         ma_group = getgroupfromacs(mailbases[j]['listacs'])            
@@ -888,6 +887,7 @@ def write_msgbase_subscription(mbaseid, newscan):
 #------------------------------------------------------------------------------
 
 
+#------------------------------------------------------------------------------
 def processmsg(msghdr):
   global user
   global mailbase
@@ -1027,7 +1027,6 @@ def get_msgs(index=-1):
           msg_count += 1
           count += 1
       msg_prev(msgbase)       
-
     
     ## read messages forward
     msg_seek(msgbase, index) 
@@ -1083,7 +1082,7 @@ def index_msgs(mbaseid,index=-1):
     global cfg
     global user
     global file
-    global basename
+    #global basename
     global msgbase
 
     base = getmbaseid(mbaseid)
@@ -1093,7 +1092,7 @@ def index_msgs(mbaseid,index=-1):
         return  
 
     file = base['path']+base['filename'] #no extension
-    basename = base['filename'].upper()
+    #basename = base['filename'].upper()
 
     if base == None:
       msgdialog(' Error ','Msgbase not found!')
@@ -1354,6 +1353,8 @@ def set_area():
     return selbar, top
 #------------------------------------------------------------------------------
 
+
+#------------------------------------------------------------------------------
 def key_up(selbar, top):
   global items
 
@@ -1370,8 +1371,10 @@ def key_up(selbar, top):
       selbar = top
   
   return selbar, top
+#------------------------------------------------------------------------------
 
 
+#------------------------------------------------------------------------------
 def key_down(selbar, top):
   global items
 
@@ -1393,6 +1396,8 @@ def key_down(selbar, top):
       top += 1
 
   return selbar, top
+#------------------------------------------------------------------------------
+
 
 #------------------------------------------------------------------------------
 def treelist():
@@ -1660,7 +1665,7 @@ def treelist():
                 if msg_count == 0:    
 
                   #show dialog and exit
-                  s = config.msg_no_messages.replace('|&1',basename)
+                  s = config.msg_no_messages.replace('|&1',mailbase['filename'].upper())
                   msgdialog(' Mail ',s)
 
                 else:
@@ -1796,19 +1801,18 @@ def treelist():
               pause(True)
 
               redraw = True
-      #------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 
 
 ################################################################################################################################
 # Mail list
 ################################################################################################################################
 
-
 #------------------------------------------------------------------------------
 def maillist(mbaseid):
   global last_msg_num
   global msgtext
-  global basename
+  #global basename
   global msg_count
   global debug
   global msg_lastID
@@ -2348,10 +2352,12 @@ else:
     #current mailarea
     else:      
       index_msgs(user['mbase'])
+      mailbase = getmbaseid(user['mbase'])
+
       last_msg_num = get_last_read_msg_num()
       
       if msg_count == 0:    
-        s = config.msg_no_messages.replace('|&1',basename)
+        s = config.msg_no_messages.replace('|&1',mailbase['filename'].upper())
         msgdialog(' Mail ',s)          #show dialog and exit
 
       else:

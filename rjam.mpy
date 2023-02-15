@@ -848,7 +848,7 @@ def get_new_mail_count(recount=False):
     #ADD CUSTOM INDEXING TO READ COUNTS
     count = 0
 
-    if mailbase['nettype'] == 0 or mailbase['nettype'] == 3 or 'YOU' in actions:
+    if 'NEW' not in actions and (mailbase['nettype'] == 0 or mailbase['nettype'] == 3 or 'YOU' in actions):
       #if private/email/netmail or YOU count posts to user
       if recount == False:          
         #count = count_msgs(file)

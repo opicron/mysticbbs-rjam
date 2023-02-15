@@ -617,14 +617,15 @@ def get_new_mail_count():
     if 'YOU' in actions:
       #if base['id'] in config.private_bases:
       if mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
-        mailbases[i]['total'] = total-yours+new
+        mailbases[i]['total'] = 0
+        mailbases[i]['new'] = yours
         #yours is incorrect (bug of mystic?)
       else:
         mailbases[i]['total'] = -1
-      mailbases[i]['new'] = yours
+        mailbases[i]['new'] = yours #how to count these?! (this is public mailbase when only showing your messages)
     #elif base['id'] in config.private_bases:
     elif mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
-      mailbases[i]['total'] = total
+      mailbases[i]['total'] = 0
       mailbases[i]['new'] = yours
     else:
       mailbases[i]['total'] = total
@@ -898,30 +899,45 @@ def processmsg(msghdr):
   add = False
 
   if msghdr['deleted'] == False and msghdr['from'] != '':
-  
-    if "NEW" not in actions:
-      add = True
-   
-    #if user['mbase'] in config.private_bases:
-    if mailbase['nettype'] == 0:
-        add = False
 
-        #both from/to name/handle are added
-        if 'NOFROM' in actions:
-          if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper():
-            add = True        
-        else:
-          if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['from'].upper() or user["handle"].upper() == msghdr['from'].upper():
-            add = True
+    # determine from/to only in netmail/email/private OR when YOU is selected
+    if mailbase['nettype'] == 0 or mailbase['nettype'] == 3 or 'YOU' in actions:
 
-    #if only show mail to you (undo previous set add flag)
-    if "YOU" in actions:
       if 'NOFROM' in actions:
         if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper():
-          add = True 
-      else:
-        if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper() or user["handle"].upper() == msghdr['from'].upper() or user["name"].upper() == msghdr['from'].upper():
           add = True
+      #else:
+      #  if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['from'].upper() or user["handle"].upper() == msghdr['from'].upper():
+      #    add = True
+    else:
+      add = True
+
+
+#    weird old code below, was I tripping:/
+#
+#    if "NEW" not in actions and "YOU" not in actions:
+#      add = True
+#   
+#    #if user['mbase'] in config.private_bases:
+#    if mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
+#        add = False
+#
+#        #both from/to name/handle are added
+#        if 'NOFROM' in actions:
+#          if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper():
+#            add = True        
+#        else:
+#          if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['from'].upper() or user["handle"].upper() == msghdr['from'].upper():
+#            add = True
+#
+#    #if only show mail to you (undo previous set add flag)
+#    if "YOU" in actions:
+#      if 'NOFROM' in actions:
+#        if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper():
+#          add = True 
+#      else:
+#        if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper() or user["handle"].upper() == msghdr['from'].upper() or user["name"].upper() == msghdr['from'].upper():
+#          add = True
 
     if add == True:
 
@@ -1708,19 +1724,44 @@ def treelist():
 
           elif key == KEY_CTRLN:
 
-              #only use first private for local mail
-              mailbase = getmbaseid(current_mbase)
-              if mailbase['nettype'] == 0:
-                #if current_mbase == config.private_bases[0]:
-                menucmd('MW','')
-              elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1:
-                #netmail nettype == 3
-                write('|IF')
-                menucmd('MP','')
+            mailbase = getmbaseid(current_mbase)
 
-              drawbackground()
-              redraw_hdr = True  
-              redraw = True
+            write('|#X#2##20#6#60#10#')
+            write('|[X22|[Y08|07Send to    |08[.......................]')
+            write('|[X34|[Y08')
+
+            if mailbase['nettype'] == 1:
+              to = getstr(11, 23, 23, "All")
+            else:
+              to = getstr(11, 23, 23, "")
+
+            if to != None and len(to) > 1:
+
+              to = to.replace(' ','_')  #spaces bug the receiver..
+
+              write('|#X#2##10#6#70#10#')
+              write('|[X12|[Y08|07Subject    |08[...........................................]')
+              write('|[X24|[Y08')
+              subject = getstr(11, 43, 43, "")
+
+              if subject != None and len(subject) > 1:
+
+                subject = subject.replace(' ','_')  #spaces bug the receiver..
+                subject = subject.replace('/F','\F')  #/F is seen as /FORCED no matter what
+
+                #only use first private for local mail
+                if mailbase['nettype'] == 0:
+                  #if current_mbase == config.private_bases[0]:
+                  menucmd('MW','/to:'+to+' /subj:'+subject)
+                elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1:
+                  #netmail nettype == 3
+                  write('|CL')
+                  write('|IF')
+                  menucmd('MP','/to:'+to+' /subj:'+subject)
+
+            drawbackground()
+            redraw_hdr = True  
+            redraw = True
 
           elif key == KEY_CTRLS:
 
@@ -1847,8 +1888,10 @@ def maillist(mbaseid):
   if last_msg_num > 0:
     while selbar == -1 and count < msg_count:
       if msgs[count]['msg_number'] > last_msg_num:
-        #if (user['mbase'] not in config.private_bases and 'YOU' not in actions) or ((user['mbase'] in config.private_bases or 'YOU' in actions) and (user["handle"].upper() == msgs[count]['msg_to'].upper() or user["name"].upper() == msgs[count]['msg_to'].upper())):
-        if (not private_base and 'YOU' not in actions) or ((private_base or 'YOU' in actions) and (user["handle"].upper() == msgs[count]['msg_to'].upper() or user["name"].upper() == msgs[count]['msg_to'].upper())):
+        ## OLD! - if (user['mbase'] not in config.private_bases and 'YOU' not in actions) or ((user['mbase'] in config.private_bases or 'YOU' in actions) and (user["handle"].upper() == msgs[count]['msg_to'].upper() or user["name"].upper() == msgs[count]['msg_to'].upper())):
+        
+        #always jump to correct new message, also when only your mail is searched
+        #if (not private_base and 'YOU' not in actions) or ((private_base or 'YOU' in actions) and (user["handle"].upper() == msgs[count]['msg_to'].upper() or user["name"].upper() == msgs[count]['msg_to'].upper())):
           selbar = count
           top = selbar
           break
@@ -1909,15 +1952,16 @@ def maillist(mbaseid):
           setpinfo(9, '')  #was used for readbit
 
           if last_msg_num < msgs[y]['msg_number']:
-            
+            #always show if message is new or not
             #if ('YOU' not in actions and user['mbase'] not in config.private_bases) or (user["handle"].upper() == msgs[y]['msg_to'].upper() or user["name"].upper() == msgs[y]['msg_to'].upper()):
-            if ('YOU' not in actions and not private_base) or (user["handle"].upper() == msgs[y]['msg_to'].upper() or user["name"].upper() == msgs[y]['msg_to'].upper()):
-              if selbar != y:    
-                s = config.hdr_str_new
-              setpinfo(8, '|14*')
-            else:
+            #if ('YOU' not in actions and not private_base) or (user["handle"].upper() == msgs[y]['msg_to'].upper() or user["name"].upper() == msgs[y]['msg_to'].upper()):
+            if selbar != y:    
+              s = config.hdr_str_new
+            setpinfo(8, '|14*')
+            #else:
               #setpinfo(8, '|05>')
-              setpinfo(8, ' ')
+          else:
+            setpinfo(8, ' ')
                   
           setpinfo(1, msg['msg_subject'])        
           setpinfo(2, msg['msg_from'])
@@ -2142,21 +2186,45 @@ def maillist(mbaseid):
 
       elif key == 'N':
 
-          #only use first private for local mail
-          if mailbase['nettype'] == 0:
-            #if mbaseid == config.private_bases[0]:
-            menucmd('MW','')
-          elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1:
-            write('|IF')
-            menucmd('MP','')
+        write('|#X#2##20#6#60#10#')
+        write('|[X22|[Y08|07Send to    |08[.......................]')
+        write('|[X34|[Y08')
 
-          drawbackground()
+        if mailbase['nettype'] == 1:
+          to = getstr(11, 23, 23, "All")
+        else:
+          to = getstr(11, 23, 23, "")
 
-          #load new message at end of 
-          load_nextmsg(msgs[len(msgs)-1]['msg_number'])
-          
-          redraw_hdr = True    
-          redraw = True 
+
+        if to != None and len(to) > 1:
+
+          to = to.replace(' ','_')  #spaces bug the receiver..
+
+          write('|#X#2##10#6#70#10#')
+          write('|[X12|[Y08|07Subject    |08[...........................................]')
+          write('|[X24|[Y08')
+          subject = getstr(11, 43, 43, "")
+
+          if subject != None and len(subject) > 1:
+
+            subject = subject.replace(' ','_')  #spaces bug the receiver..
+            subject = subject.replace('/F','\F')  #/F is seen as /FORCED no matter what
+
+            #only use first private for local mail
+            if mailbase['nettype'] == 0:
+              #if mbaseid == config.private_bases[0]:
+              menucmd('MW','/to:'+to+' /subj:'+subject)
+            elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1:
+              write('|CL')
+              write('|IF')
+              menucmd('MP','/to:'+to+' /subj:'+subject)
+
+           #load new message at end of 
+            load_nextmsg(msgs[len(msgs)-1]['msg_number'])
+
+        drawbackground()
+        redraw_hdr = True    
+        redraw = True 
 
       elif key == '[':
           if config.max_header_lines > 1:
@@ -2251,10 +2319,13 @@ mailbase      = False
 
 actions = []
 
+#temporaly only show mail addressed to you in netmail/email/private
+actions.append('NOFROM')
+
 i = 1
 while i <= param_count():
   arg = param_str(i).upper()  
-
+  
   if arg == "/YOU":
     actions.append('YOU')
 

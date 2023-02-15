@@ -580,12 +580,245 @@ def get_mailbases():
 #------------------------------------------------------------------------------
 
 
+###################################################################################################################
+# Message base functions
+###################################################################################################################
+
+
+###################################################################################################################
+# JAM vars
+###################################################################################################################
+
 #------------------------------------------------------------------------------
-def get_new_mail_count():
+STATUSBITS = \
+{
+  "MSG_REMOVED"      : 0x00000000L     # 0st bit > LocalMsg
+, "MSG_LOCAL"        : 0x00000001L     # 0st bit > LocalMsg
+, "MSG_INTRANSIT"    : 0x00000002L     # 1nd bit > Msg is in-transit 
+, "MSG_PRIVATE"      : 0x00000004L     # 2rd bit > Private 
+, "MSG_READ"         : 0x00000008L     # 3th bit > Read by addressee
+, "MSG_SENT"         : 0x00000010L     # Sent to remote
+, "MSG_KILLSENT"     : 0x00000020L     # Kill when sent
+, "MSG_ARCHIVESENT"  : 0x00000040L     # Archive when sent
+, "MSG_HOLD"         : 0x00000080L     # Hold for pick-up
+, "MSG_CRASH"        : 0x00000100L     # Crash
+, "MSG_IMMEDIATE"    : 0x00000200L     # Send Msg now, ignore restrictions
+, "MSG_DIRECT"       : 0x00000400L     # 10 Send directly to destination
+, "MSG_GATE"         : 0x00000800L     # Send via gateway
+, "MSG_FILEREQUEST"  : 0x00001000L     # File request
+, "MSG_FILEATTACH"   : 0x00002000L     # File(s) attached to Msg
+, "MSG_TRUNCFILE"    : 0x00004000L     # Truncate file(s) when sent
+, "MSG_KILLFILE"     : 0x00008000L     # Delete file(s) when sent
+, "MSG_RECEIPTREQ"   : 0x00010000L     # Return receipt requested
+, "MSG_CONFIRMREQ"   : 0x00020000L     # Confirmation receipt requested
+, "MSG_ORPHAN"       : 0x00040000L     # Unknown destination
+, "MSG_ENCRYPT"      : 0x00080000L     # Msg text is encrypted
+, "MSG_COMPRESS"     : 0x00100000L     # 20 Msg text is compressed
+, "MSG_ESCAPED"      : 0x00200000L     # Msg text is seven bit ASCII
+, "MSG_FPU"          : 0x00400000L     # Force pickup
+, "MSG_TYPELOCAL"    : 0x00800000L     # Msg is for local use only (no export)
+, "MSG_TYPEECHO"     : 0x01000000L     # Msg is for conference distribution
+, "MSG_TYPENET"      : 0x02000000L     # Msg is direct network mail
+, "MSG_NODISP"       : 0x20000000L     # Msg may not be displayed to user
+, "MSG_LOCKED"       : 0x40000000L     # Msg is locked, no editing possible
+, "MSG_DELETED"      : 0x80000000L     # 31 Msg is deleted
+}
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+SUBFIELDTYPES = \
+{
+  0      : "OADDRESS"
+, 1      : "DADDRESS"
+, 2      : "SENDERNAME"
+, 3      : "RECVRNAME"
+, 4      : "MSGID"
+, 5      : "REPLYID"
+, 6      : "SUBJECT"
+, 7      : "PID"
+, 8      : "TRACE"
+, 9      : "ENCLFILE"
+, 10     : "ENCLFWALIAS"
+, 11     : "ENCLFREQ"
+, 12     : "ENCLFILEWC"
+, 13     : "ENCLINDFILE"
+, 1000   : "EMBINDAT"
+, 2000   : "FTSKLUDGE"
+, 2001   : "SEENBY2D"
+, 2002   : "PATH2D"
+, 2003   : "FLAGS"
+, 2004   : "TZUTCINFO"
+, 0xffff : "UNKNOWN"
+}
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def get_msg_base_hdr(jhrf):
+    
+    #this function moves the pointer past the header to read messages
+    mbase_meta = dict()
+    
+    fmthdr = "<4s5L1000x"
+    fmthdr_s = struct.calcsize(fmthdr)
+    hdrstr = jhrf.read(fmthdr_s)
+
+    if len(hdrstr) > fmthdr_s:
+      #if not empty unpack
+      hdr = struct.unpack(fmthdr, hdrstr)
+        
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+## next message/r
+#------------------------------------------------------------------------------
+def raw_get_msgs(jhrf):
+    global user
+
+    # /*
+    # **  Message header
+    # */
+    # typedef struct
+    # {
+    #     CHAR8   Signature[4];              /* <J><A><M> followed by <NUL> */
+    #     UINT16  Revision;                  /* CURRENTREVLEV */
+    #     UINT16  ReservedWord;              /* Reserved */
+    #     UINT32  SubfieldLen;               /* Length of subfields */
+    #     UINT32  TimesRead;                 /* Number of times message read */
+    #     UINT32  MsgIdCRC;                  /* CRC-32 of MSGID line */
+    #     UINT32  ReplyCRC;                  /* CRC-32 of REPLY line */
+    #     UINT32  ReplyTo;                   /* This msg is a reply to.. */
+    #     UINT32  Reply1st;                  /* First reply to this msg */
+    #     UINT32  ReplyNext;                 /* Next msg in reply chain */
+    #     UINT32  DateWritten;               /* When msg was written */
+    #     UINT32  DateReceived;              /* When msg was received/read */
+    #     UINT32  DateProcessed;             /* When msg was processed by packer */
+    #     UINT32  MsgNum;                    /* Message number (1-based) */
+    #     UINT32  Attribute;                 /* Msg attribute, see "Status bits" */
+    #     UINT32  Attribute2;                /* Reserved for future use */
+    #     UINT32  TxtOffset;                 /* Offset of text in text file */
+    #     UINT32  TxtLen;                    /* Length of message text */
+    #     UINT32  PasswordCRC;               /* CRC-32 of password to access msg */
+    #     UINT32  Cost;                      /* Cost of message */
+    # }
+
+    count = 0
+
+    class MSGHDR:
+      pass
+
+    fmtmhdr = "<4s2H17L"
+    fmtmhdr_s = struct.calcsize(fmtmhdr)
+
+    while True:
+        
+        msg = dict()
+
+        #store hdr offset before read
+        msg['hdr_offset'] = jhrf.tell()
+
+        msgstr = jhrf.read(fmtmhdr_s)
+        l = len(msgstr)
+        if l != fmtmhdr_s:
+            if l > 0:
+              print "Error: %d extranious bytes at end of file", l
+            break
+    
+        mh = MSGHDR()
+        ( mh.Signature
+        , mh.Revision
+        , mh.ReservedWord
+        , mh.SubfieldLen
+        , mh.TimesRead
+        , mh.MsgIdCRC
+        , mh.ReplyCRC
+        , mh.ReplyTo
+        , mh.Reply1st
+        , mh.ReplyNext
+        , mh.DateWritten
+        , mh.DateReceived
+        , mh.DateProcessed
+        , mh.MsgNum
+        , mh.Attribute
+        , mh.Attribute2
+        , mh.TxtOffset
+        , mh.TxtLen
+        , mh.PasswordCRC
+        , mh.Cost ) = struct.unpack(fmtmhdr, msgstr)
+
+        #msg['hdr_sf'] = last_pos     
+        #msg['msg_date']     = TimeStr(mh.DateWritten)
+        #msg['msg_number']   = mh.MsgNum
+        msg['attribute']    = mh.Attribute
+        #msg['txt_start']    = mh.TxtOffset     #no longer necessary when using msg_gettxt from mysticbbs
+        #msg['txt_len']      = mh.TxtLen        #no longer necessary when using msg_gettxt from mysticbbs
+
+        class SUBFIELD:
+            pass
+
+        b = 0
+        subfieldstr = jhrf.read(mh.SubfieldLen)
+        
+        fmtsf = "<2HL"
+        fmtsf_s = struct.calcsize(fmtsf)
+        while b < mh.SubfieldLen:
+            sf = SUBFIELD()
+            (sf.LoID, sf.HiID, sf.DatLen) = struct.unpack(fmtsf, subfieldstr[b:b + fmtsf_s])
+            b += fmtsf_s
+            sf.Buffer = subfieldstr[b:b + sf.DatLen]
+            b += sf.DatLen
+            sftype = SUBFIELDTYPES[sf.LoID] if sf.LoID in SUBFIELDTYPES else "Undefined"
+
+            #if sftype == "SUBJECT":                
+            #    msg['msg_subject'] = sf.Buffer
+            #if sftype == "SENDERNAME":
+            #    msg['msg_from'] = sf.Buffer             
+            if sftype == "RECVRNAME":
+              msg['msg_to'] = sf.Buffer
+
+        # if not deleted or nulled (by editmsg in mystic)
+        if STATUSBITS["MSG_DELETED"] & msg['attribute'] == 0: # and msg['attribute'] != 0:
+          try:
+            if user["handle"] == msg['msg_to'] or user["name"] == msg['msg_to']:
+              count = count + 1
+          except:
+            pass
+
+    #print
+    #return (msg_sf_end,msg,MessageNumber,msgs_subflds,Offset, Offset+TxtLen)
+    return count
+
+
+def count_msgs(file):
+    #fileNameHdr = mbbs_msgs_dir + "/" + mbbs_msgs_base + ".jhr"
+    #jhrf = open(fileNameHdr, "rb")
+    file = file+".jhr"
+    jhrf = open(file, "rb")
+
+    get_msg_base_hdr(jhrf)
+    count = raw_get_msgs(jhrf)
+
+    jhrf.close()
+    return count
+
+
+
+
+
+#------------------------------------------------------------------------------
+def get_new_mail_count(recount=False):
   global user
   global mailbases
   global msgs
   global file
+
+  if 'YOU' in actions:
+    #show loading stats
+    write('|#X#2##20#6#60#10#')
+    write("|[X22|[Y08|15Indexing message bases, hold on .. ")
+    flush()    
 
   #loop indexed mailareas  
   for i in range(len(mailbases)):
@@ -607,30 +840,60 @@ def get_new_mail_count():
       
     msgs    = []
     msgbase = msg_open(file)
-    
+
+
+
+
+    #---------------------------------------------
+    #ADD CUSTOM INDEXING TO READ COUNTS
+    count = 0
+
+    if mailbase['nettype'] == 0 or mailbase['nettype'] == 3 or 'YOU' in actions:
+      #if private/email/netmail or YOU count posts to user
+      if recount == False:          
+        #count = count_msgs(file)
+        #"""
+        msg_seek(msgbase, -1) 
+        while msg_found(msgbase) and not shutdown():
+          msghdr = msg_gethdr(msgbase)
+          if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper():
+            count = count + 1
+          #tmpid = int(msghdr['number'])
+          #msg, add = processmsg(msghdr)
+          #if add:
+          #  if len(msgs) == 0 or msgs[len(msgs)-1]['msg_number'] <> msg['msg_number']:
+          #    msgs.append(msg)
+          #    msg_count += 1
+          #    return True
+          msg_next(msgbase)
+          #"""
+
+
     # get lastread      
     lr = msg_getlr (msgbase, user['id'])   
 
-    # get stats
-    total, new, yours, lastpost = msg_stats(msgbase)
+    if ('YOU' not in actions and recount == False) or (recount == False and 'YOU' in actions):
+      # get stats
+      total, new, yours, lastpost = msg_stats(msgbase)
 
-    if 'YOU' in actions:
-      #if base['id'] in config.private_bases:
-      if mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
-        mailbases[i]['total'] = 0
+      if 'YOU' in actions:
+        #if base['id'] in config.private_bases:
+        if mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
+          mailbases[i]['total'] = count
+          mailbases[i]['new'] = yours
+        else:
+          # ITS CLEAR, WHEN CHECKING STATS OF PUBLIC NETAREA: yours = your new messages
+          # it would be nice to give option to msg_stats when only checking YOUR messages (total = total your messages, new = your new messages, yours = total?)
+          mailbases[i]['total'] = count #
+          #yours is incorrect (bug of mystic?)
+          mailbases[i]['new'] = yours #how to count these?! (this is public mailbase when only showing your messages)
+      #elif base['id'] in config.private_bases:
+      elif mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
+        mailbases[i]['total'] = count
         mailbases[i]['new'] = yours
-        #yours is incorrect (bug of mystic?)
       else:
-        mailbases[i]['total'] = -1
-        mailbases[i]['new'] = yours #how to count these?! (this is public mailbase when only showing your messages)
-    #elif base['id'] in config.private_bases:
-    elif mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
-      mailbases[i]['total'] = 0
-      mailbases[i]['new'] = yours
-    else:
-      mailbases[i]['total'] = total
-      mailbases[i]['new'] = new
-    
+        mailbases[i]['total'] = total
+        mailbases[i]['new'] = new
 
     msg_close(msgbase)
 #------------------------------------------------------------------------------
@@ -707,7 +970,8 @@ def loadmainlist(count=False):
 
   get_subscriptions()
 
-  get_new_mail_count()
+
+  get_new_mail_count(count)
   purge_areas()
 
   res = []

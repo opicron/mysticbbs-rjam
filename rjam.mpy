@@ -848,52 +848,45 @@ def get_new_mail_count(recount=False):
     #ADD CUSTOM INDEXING TO READ COUNTS
     count = 0
 
+    #ODDITY
+    if 'NEW' in actions:
+      mailbases[i]['total'] = count
+
+
     if 'NEW' not in actions and (mailbase['nettype'] == 0 or mailbase['nettype'] == 3 or 'YOU' in actions):
       #if private/email/netmail or YOU count posts to user
       if recount == False:          
-        #count = count_msgs(file)
-        #"""
+
         msg_seek(msgbase, -1) 
         while msg_found(msgbase) and not shutdown():
+
           msghdr = msg_gethdr(msgbase)
           if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper():
             count = count + 1
-          #tmpid = int(msghdr['number'])
-          #msg, add = processmsg(msghdr)
-          #if add:
-          #  if len(msgs) == 0 or msgs[len(msgs)-1]['msg_number'] <> msg['msg_number']:
-          #    msgs.append(msg)
-          #    msg_count += 1
-          #    return True
           msg_next(msgbase)
-          #"""
+
+        # only set YOU total count once on first run
+        mailbases[i]['total'] = count
 
 
     # get lastread      
     lr = msg_getlr (msgbase, user['id'])   
 
-    if ('YOU' not in actions and recount == False) or (recount == False and 'YOU' in actions):
-      # get stats
-      total, new, yours, lastpost = msg_stats(msgbase)
+    # get stats
+    total, new, yours, lastpost = msg_stats(msgbase)
 
+    # set stats
+    if mailbase['nettype'] == 0 or mailbase['nettype'] == 3: #or 'YOU' in actions:
+      mailbases[i]['new'] = yours
+    else:
       if 'YOU' in actions:
-        #if base['id'] in config.private_bases:
-        if mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
-          mailbases[i]['total'] = count
-          mailbases[i]['new'] = yours
-        else:
-          # ITS CLEAR, WHEN CHECKING STATS OF PUBLIC NETAREA: yours = your new messages
-          # it would be nice to give option to msg_stats when only checking YOUR messages (total = total your messages, new = your new messages, yours = total?)
-          mailbases[i]['total'] = count #
-          #yours is incorrect (bug of mystic?)
-          mailbases[i]['new'] = yours #how to count these?! (this is public mailbase when only showing your messages)
-      #elif base['id'] in config.private_bases:
-      elif mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
-        mailbases[i]['total'] = count
         mailbases[i]['new'] = yours
       else:
-        mailbases[i]['total'] = total
         mailbases[i]['new'] = new
+        mailbases[i]['total'] = total
+
+
+
 
     msg_close(msgbase)
 #------------------------------------------------------------------------------

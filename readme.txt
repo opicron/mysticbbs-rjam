@@ -1,5 +1,5 @@
 
-## rJAM v0.13
+## rJAM v0.16
 ======================================================================================================
 
 
@@ -16,19 +16,6 @@ Copy msggroups.ans and reader.ans to your /text/ folder
 Copy contents of /rjam/ to /script/rjam/ folder
 Rename config.py.sample to config.py in /scripts/rjam/
 Execute rjam with the default Python script command in menu
-
-
-## Set private email / netmail areas
-------------------------------------------------------------------------------------------------------
-In the renamed config.py file the IDs of the private email/netmail areas have to be set. Do note that 
-the first ID has to be the private local mail area. All other IDs after the local private area should 
-be netmails.
-
-The private local mail area is the email area id. In which users can only see their own mail.
-
-    private_bases = [#,#,#]     # multiple IDs (first value local private mail, all others netmail)
-    private_bases = [#]         # single ID (private local email base only!)
-
 
 
 ## OPTIONAL Parameters / Arguments

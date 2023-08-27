@@ -1552,7 +1552,10 @@ def draw_msg_body(msg,index,top=0,dumpquote=False,echohdr=False):
           elif j+top > msglines-2 and msgtext[j+top].strip()[:2].find('* ') > -1:
             write(config.msg_body_low)
 
-          write(msgtext[j+top])
+          #if j+top<msglines-5:
+          pwrite(msgtext[j+top])
+          #else:
+          #  write(msgtext[j+top])
 
         # clear line until end of config.max_body_lines
         if wherey()==j+start_y:      

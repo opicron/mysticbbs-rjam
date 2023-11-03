@@ -2662,13 +2662,14 @@ if 'CHANGEAREA' in actions:
 else:
 
   if "MAILLIST" in actions or "EMAIL" in actions:  
-
+    
     #private localmail
     if "EMAIL" in actions: 
 
       #try to find email base (localmail)
       for i in range(len(mailbases)):
-        if mailbases[i]['nettype'] == 0:           
+        if mailbases[i]['nettype'] == 0: 
+          mailbase = getmbaseid(mailbases[i]['id'])        
           index_msgs(mailbases[i]['id'])
           last_msg_num = get_last_read_msg_num()
           maillist(mailbases[i]['id'])
@@ -2682,9 +2683,8 @@ else:
 
     #current mailarea
     else:      
-      index_msgs(user['mbase'])
       mailbase = getmbaseid(user['mbase'])
-
+      index_msgs(user['mbase'])
       last_msg_num = get_last_read_msg_num()
       
       if msg_count == 0:    

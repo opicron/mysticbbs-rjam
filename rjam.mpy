@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # rjam.py
-# v0.16
+# v0.17
 #
 #
 # !:
@@ -2433,8 +2433,9 @@ def maillist(mbaseid):
             write('|CL')
             menucmd('MP','/to:'+to+' /subj:'+subject+' /addr: ')
 
-        redraw_hdr = True
         drawbackground()
+        redraw_hdr = True
+        #redraw = True
 
       elif key == KEY_ENTER:
 

@@ -861,8 +861,15 @@ def get_new_mail_count(recount=False):
         while msg_found(msgbase) and not shutdown():
 
           msghdr = msg_gethdr(msgbase)
-          if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper():
-            count = count + 1
+          #if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper():
+          #  count = count + 1
+          if 'NOFROM' in actions:
+            if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper():
+              count = count + 1
+          else:
+            if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['from'].upper() or user["handle"].upper() == msghdr['from'].upper():
+              count = count + 1
+
           msg_next(msgbase)
 
         # only set YOU total count once on first run
@@ -1159,13 +1166,13 @@ def processmsg(msghdr):
 
     # determine from/to only in netmail/email/private OR when YOU is selected
     if mailbase['nettype'] == 0 or mailbase['nettype'] == 3 or 'YOU' in actions:
-
+      
       if 'NOFROM' in actions:
         if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper():
           add = True
-      #else:
-      #  if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['from'].upper() or user["handle"].upper() == msghdr['from'].upper():
-      #    add = True
+      else:
+        if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['from'].upper() or user["handle"].upper() == msghdr['from'].upper():
+          add = True
     else:
       add = True
 
@@ -2581,7 +2588,7 @@ mailbase      = False
 actions = []
 
 #temporaly only show mail addressed to you in netmail/email/private
-actions.append('NOFROM')
+#actions.append('NOFROM')
 
 i = 1
 while i <= param_count():

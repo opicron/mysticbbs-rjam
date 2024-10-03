@@ -1156,6 +1156,7 @@ def write_msgbase_subscription(mbaseid, newscan):
 def processmsg(msghdr):
   global user
   global mailbase
+  global mailbases
   global actions
 
   msg = dict()
@@ -1167,12 +1168,19 @@ def processmsg(msghdr):
     # determine from/to only in netmail/email/private OR when YOU is selected
     if mailbase['nettype'] == 0 or mailbase['nettype'] == 3 or 'YOU' in actions:
       
-      if 'NOFROM' in actions:
-        if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper():
-          add = True
-      else:
-        if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['from'].upper() or user["handle"].upper() == msghdr['from'].upper():
-          add = True
+      # only index subbed mailbases, for efficiency
+      index = False
+      for i in range(len(mailbases)):
+        if mailbases[i]['id'] == mailbase['id'] and mailbases[i]['subbed'] == 1: 
+          index = True
+      
+      if index:
+        if 'NOFROM' in actions:
+          if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper():
+            add = True
+        else:
+          if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['from'].upper() or user["handle"].upper() == msghdr['from'].upper():
+            add = True
     else:
       add = True
 

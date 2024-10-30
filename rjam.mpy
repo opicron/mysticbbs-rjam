@@ -82,7 +82,7 @@ if not hasattr(config, 'mg_str_group'):           config.mg_str_group      = '|1
 if not hasattr(config, 'mg_str_area'):            config.mg_str_area       = '|16|&9|&8|07|$T24|&1|$X48 |[X48|14|$L04|&3|$X53  |07|$L04|&2|$X58  '    #truncated name and right justified count
 if not hasattr(config, 'mg_str_highlight'):       config.mg_str_highlight  = '|19|&9|&8|15|$T24|&1|$X48 |[X48|14|$L04|&3|$X53  |15|$L04|&2|$X58 |16 ' #truncated name and right justified count
 if not hasattr(config, 'mg_str_empty'):           config.mg_str_empty      = '|16|$X58  '
-if not hasattr(config, 'mg_str_unsubbed'):        config.mg_str_unsubbed   = '|05>'
+if not hasattr(config, 'mg_str_unsubbed'):        config.mg_str_unsubbed   = '|12-'
 if not hasattr(config, 'mg_str_new'):             config.mg_str_new        = '|14*'
 if not hasattr(config, 'mg_no_new'):              config.mg_no_new         = '|08'+chr(250)
 if not hasattr(config, 'mg_bar_start'):           config.mg_bar_start     = '|[X60|[Y09'
@@ -1171,7 +1171,7 @@ def processmsg(msghdr):
       # only index subbed mailbases, for efficiency
       index = False
       for i in range(len(mailbases)):
-        if mailbases[i]['id'] == mailbase['id'] and mailbases[i]['subbed'] == 1: 
+        if mailbases[i]['id'] == mailbase['id'] or mailbases[i]['subbed'] == 1: 
           index = True
       
       if index:
@@ -1734,7 +1734,8 @@ def treelist():
     oldbar = -1
     redraw = True
 
-    menucmd('NA','Viewing Mailbases')
+    menucmd('NA','rJAM - Viewing Mailbases')
+    sysoplog(1,'rJAM - Viewing Mailbases')
 
     while done == False and not shutdown():
 
@@ -1962,17 +1963,17 @@ def treelist():
                 else:
                   maillist(items[selbar]['id'])
 
+                #update node status
+                menucmd('NA','rJAM - Viewing Mailbases')
+                #sysoplog(1,'rJAM - Reading Mailbases')
+
                 # reload group/area
                 # count only!
-
                 items = loadmainlist(True)
                 if len(items)==0:
                   done = True
                 if selbar > len(items) - 1:
                   selbar = 1
-
-                #update node status
-                menucmd('NA','Viewing Mailbases')
 
                 redraw = True
 
@@ -2003,9 +2004,12 @@ def treelist():
 
             write('|#X#2##20#6#60#10#')
             write('|[X22|[Y08|07Send to    |08[.......................]')
-            write('|[X34|[Y08')
+            write('|[X34|[Y08|15')
 
-            if mailbase['nettype'] == 1:
+            #gotoxy(1,1)
+            #write(str(mailbase['flags']))
+
+            if mailbase['nettype'] == 1 or mailbase['flags'] == 68:
               to = getstr(11, 23, 23, "All")
             else:
               to = getstr(11, 23, 23, "")
@@ -2025,10 +2029,10 @@ def treelist():
                 subject = subject.replace('/F','\F')  #/F is seen as /FORCED no matter what
 
                 #only use first private for local mail
-                if mailbase['nettype'] == 0:
+                if mailbase['nettype'] == 0 and mailbase['flags'] != 68:
                   #if current_mbase == config.private_bases[0]:
                   menucmd('MW','/to:'+to+' /subj:'+subject)
-                elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1:
+                elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1 or mailbase['flags'] == 68:
                   #netmail nettype == 3
                   write('|CL')
                   write('|IF')
@@ -2137,8 +2141,6 @@ def maillist(mbaseid):
   global msgbase #to close msgbase on leaving the mail list
   global mailbase
    
-  menucmd('NA','Reading Messages')
-
   #msg_hdr_line_mod = 0
 
   top_body  = 0
@@ -2156,6 +2158,9 @@ def maillist(mbaseid):
   mailbase = getmbaseid(mbaseid)
   if mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
     private_base = True
+
+  menucmd('NA','rJAM - Reading Messages')
+  sysoplog(1,'rJAM - Reading Messages - ' + mailbase['name'])
 
   #logerror('test')
   #logerror(str(msgbase))
@@ -2388,6 +2393,8 @@ def maillist(mbaseid):
         subject = subject.replace(' ','_')  #spaces bug the response..
         subject = subject.replace('/F','\F')  #/F is seen as /FORCED no matter what
 
+        sysoplog(1,'rJAM - Replying to message - ' + msgs[selbar]['msg_from'] + ' - ' + msgs[selbar]['msg_subject'])
+
         #if basename == "EMAIL":
         if mailbase['nettype'] == 0:
           #if user['mbase'] in config.private_bases:                  
@@ -2486,6 +2493,8 @@ def maillist(mbaseid):
             subject = subject.replace(' ','_')  #spaces bug the receiver..
             subject = subject.replace('/F','\F')  #/F is seen as /FORCED no matter what
 
+            sysoplog(1,'rJAM - Writing new message - ' + to + ' - ' + subject)
+
             #only use first private for local mail
             if mailbase['nettype'] == 0:
               #if mbaseid == config.private_bases[0]:
@@ -2495,9 +2504,9 @@ def maillist(mbaseid):
               write('|IF')
               menucmd('MP','/to:'+to+' /subj:'+subject)
 
-           #load new message at end of 
+            #load new message at end of 
             load_nextmsg(msgs[len(msgs)-1]['msg_number'])
-
+            
         drawbackground()
         redraw_hdr = True    
         redraw = True 
@@ -2580,7 +2589,6 @@ def maillist(mbaseid):
 ######################################################################################################################
 # MAIN
 ######################################################################################################################
-
 
 #------------------------------------------------------------------------------
 cfg           = getcfg()   

@@ -2396,10 +2396,10 @@ def maillist(mbaseid):
         sysoplog(1,'rJAM - Replying to message - ' + msgs[selbar]['msg_from'] + ' - ' + msgs[selbar]['msg_subject'])
 
         #if basename == "EMAIL":
-        if mailbase['nettype'] == 0:
+        if mailbase['nettype'] == 0 and mailbase['flags'] != 68:
           #if user['mbase'] in config.private_bases:                  
           menucmd('MW','/to:'+to+' /subj:'+subject)
-        elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1:
+        elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1 or mailbase['flags'] == 68:
           msgtext = get_msg_body(selbar, msgs[selbar],True)
           msgtext = multiple_replace(msgtext, config.rep)
           msgtext = utf_to_ascii( msgtext )

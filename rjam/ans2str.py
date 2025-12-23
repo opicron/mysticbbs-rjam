@@ -77,7 +77,7 @@ def set_graphics():
             #    fg_color = 0 #reset color back to old color (else fg_color = 0)       
             #else:
             #    fg_color = 15     
-            fg_color = 15  
+            fg_color = 15
             #fg_color = 7
             bg_color = 16 
 
@@ -291,7 +291,6 @@ def clear_line():
 #------------------------------------------------------------------------------
 
 
-#------------------------------------------------------------------------------
 def process_escape ( c ):
     global escape_mode
     global escape_str
@@ -306,6 +305,10 @@ def process_escape ( c ):
 
     if c == '[':
         return
+    elif c == '?': # aparently icydraw adds /[?33l and /[?33h ansi chars
+        return
+    elif c == 'l' or c == 'h': # aparently icydraw adds /[?33l and /[?33h ansi chars
+        escape_mode = False
     elif c == 'f' or c == 'H':
         addr_cursor()
         escape_mode = False
@@ -356,6 +359,9 @@ def process_escape ( c ):
         escape_number += 1
         escape_register [escape_number] = 0
         return
+    else: 
+        escape_mode = False
+        #print(ord(c))
 
     #ch = upcase ( c );    
     #elif c in ['T', '#', '+', '-', '>', '<', '.', '=', '?']: #? is [?;7h
@@ -454,16 +460,21 @@ def ansi2mci(s,dumpquote=False,file=False):
         
     y = 0
     lines = []
+    plaintext = []
 
     while y <= ypos and y < h:
         x = 0
         line = ""
+        plain = ""
 
         fg_col = 0
         bg_col = 0
 
         while x < w:
 
+            #if x==0:
+            #    line += str(fg_col)
+            
             if dumpquote == False:
             
                 #if fg_col <> fg_matrix[x][y] and fg_matrix[x][y] in [0,1,2,4,5,6,7,8,9,10,11,12,13,14,15]:
@@ -478,12 +489,22 @@ def ansi2mci(s,dumpquote=False,file=False):
                     line += str(bg_matrix[x][y]).zfill(2)
                     bg_col = bg_matrix[x][y]
 
-
+            #if x==0:
+            #    line += '|'+str(fg_matrix[x][y]).zfill(2)+str(fg_matrix[x][y])+chr(matrix[x][y])
+            #else:
             line += chr(matrix[x][y])
+            plain += chr(matrix[x][y])
             x += 1
+
         y += 1
         lines.append(line)         
+        plaintext.append(plain)
+    
+    #if we exit on newline because of last char exceeding width reduce ypos by one
+    if xpos == 0:
+        y -= 1
 
-    return lines
+    return lines[:y], plaintext[:y] #, matrix, fg_matrix, bg_matrix
+  
     
 #ansi2mci('FILENAME.ANS',False,True):

@@ -1,9 +1,38 @@
 # -*- coding: utf-8 -*-
 # rjam.py
 # v0.17
+
+#TODO:fix bug 
+#.-----------------| Indexing message bases, hold on ..    |
+#PYTHON ERROR (/mystic/themes/default/scripts/rjam.mpy)
+#/mystic/themes/default/scripts/rjam.mpy:1005: RuntimeWarning: tp_compare didn't return -1 or -2 for exception
+#  if recount == False:
+#  File "/mystic/themes/default/scripts/rjam.mpy", line 3526, in <module>
+#    main()
+#  File "/mystic/themes/default/scripts/rjam.mpy", line 3518, in main
+#    treelist()
+#  File "/mystic/themes/default/scripts/rjam.mpy", line 2487, in treelist
+#    items = loadmainlist(True)
+#  File "/mystic/themes/default/scripts/rjam.mpy", line 1129, in loadmainlist
+#    get_new_mail_count(count)
+#  File "/mystic/themes/default/scripts/rjam.mpy", line 1005, in get_new_mail_count
+#    if recount == False:
+#TypeError: an integer is required
 #
-#
+# TODO:
+# todo:
+# - add mouse support
+# - add search > index_search_msg > maillist (with search param, to avoid stuff)
+# - add nodebrowser/auto netmail finder on username/boardname?
+# - add default bg/fg to ans2str
+# - why is first character lost when ans2str regular text
+# * better change to PyAnsiLove
+# - better ansi determination regular expression
+# - split long desc text by word instead of 80 chars 
+# * rewrite maillist to show message basehdr in loop and based on current message baseid
+
 # !:
+# removed current_mbase to clear things up
 # subbed/all view
 # (un)subscribe from areas
 # list vars in selector line or as separate value
@@ -41,17 +70,8 @@
 # get private status from messagebase to avoid ==private_bases!
 
 
-# todo:
-# add nodebrowser/auto netmail finder on username/boardname?
-# add default bg/fg to ans2str
-# why is first character lost when ans2str regular text
-# better ansi determination regular expression
-# implement subject only screen (instead of resizing msg hdrs)
-# check if config.py exists
-# split long desc text by word instead of 80 chars 
-# add functionality for larger message width (132), keep 80 for ansi!
 
-import os, sys, datetime, struct, time, re #, zlib
+import os, sys, datetime, struct, time, re, ConfigParser #, zlib
 from mystic_bbs import *                      # mystic user/config  param_str
 
 ###################################################################################################################
@@ -75,19 +95,19 @@ import config                                 # configuration
 if not hasattr(config, 'datetimefmt'):            config.datetimefmt       = "%d %b %y" #DATETIMEFMT = "%Y-%m-%d %H:%M:%S"
 if not hasattr(config, 'rep'):                    config.rep               = {"|PN": ":PN", "|PA": ":PA", "|CL": ":CL"} 
 if not hasattr(config, 'clearscr'):               config.clearscr          = '|07|16|CL'
-if not hasattr(config, 'mg_initscreen'):          config.mg_initscreen     = '|16|CL|[X01|[Y07|[K|[Y08|[K|[Y09|[K|[Y10|[K|[Y11|[K|[Y12|[K|[Y13|[K|[Y14|[K|[Y15|[K|[Y16|[K|[Y17|[K|[Y18|[K|[Y19|[K|[Y20|[K|[Y21|[K|[Y22|[K|[Y23|[K|[Y24|[K|[Y01|[X01|DFmsggroups.ans|'
-if not hasattr(config, 'mg_startpos'):            config.mg_startpos       = '|[X22|[Y09'
-if not hasattr(config, 'mg_max_lines'):           config.mg_max_lines      = 12
-if not hasattr(config, 'mg_str_group'):           config.mg_str_group      = '|16|08|$T39|&1 |$X58:'
-if not hasattr(config, 'mg_str_area'):            config.mg_str_area       = '|16|&9|&8|07|$T24|&1|$X48 |[X48|14|$L04|&3|$X53  |07|$L04|&2|$X58  '    #truncated name and right justified count
-if not hasattr(config, 'mg_str_highlight'):       config.mg_str_highlight  = '|19|&9|&8|15|$T24|&1|$X48 |[X48|14|$L04|&3|$X53  |15|$L04|&2|$X58 |16 ' #truncated name and right justified count
-if not hasattr(config, 'mg_str_empty'):           config.mg_str_empty      = '|16|$X58  '
+#if not hasattr(config, 'mg_initscreen'):          config.mg_initscreen     = '|16|CL|[X01|[Y07|[K|[Y08|[K|[Y09|[K|[Y10|[K|[Y11|[K|[Y12|[K|[Y13|[K|[Y14|[K|[Y15|[K|[Y16|[K|[Y17|[K|[Y18|[K|[Y19|[K|[Y20|[K|[Y21|[K|[Y22|[K|[Y23|[K|[Y24|[K|[Y01|[X01|DFmsggroups.ans|'
+#if not hasattr(config, 'mg_startpos'):            config.mg_startpos       = '|[X22|[Y09'
+#if not hasattr(config, 'mg_max_lines'):           config.mg_max_lines      = 12
+#if not hasattr(config, 'mg_str_group'):           config.mg_str_group      = '|16|08|$T39|&1 |$X58:'
+#if not hasattr(config, 'mg_str_area'):            config.mg_str_area       = '|16|&9|&8|07|$T24|&1|$X48 |[X48|14|$L04|&3|$X53  |07|$L04|&2|$X58  '    #truncated name and right justified count
+#if not hasattr(config, 'mg_str_highlight'):       config.mg_str_highlight  = '|19|&9|&8|15|$T24|&1|$X48 |[X48|14|$L04|&3|$X53  |15|$L04|&2|$X58 |16 ' #truncated name and right justified count
+#if not hasattr(config, 'mg_str_empty'):           config.mg_str_empty      = '|16|$X58  '
 if not hasattr(config, 'mg_str_unsubbed'):        config.mg_str_unsubbed   = '|12-'
 if not hasattr(config, 'mg_str_new'):             config.mg_str_new        = '|14*'
 if not hasattr(config, 'mg_no_new'):              config.mg_no_new         = '|08'+chr(250)
-if not hasattr(config, 'mg_bar_start'):           config.mg_bar_start     = '|[X60|[Y09'
-if not hasattr(config, 'mg_bar_low'):             config.mg_bar_low       = '|16|08'+chr(176)
-if not hasattr(config, 'mg_bar_high'):            config.mg_bar_high      = '|16|11'+chr(178)
+#if not hasattr(config, 'mg_bar_start'):           config.mg_bar_start     = '|[X60|[Y09'
+#if not hasattr(config, 'mg_bar_low'):             config.mg_bar_low       = '|16|08'+chr(176)
+#if not hasattr(config, 'mg_bar_high'):            config.mg_bar_high      = '|16|11'+chr(178)
 if not hasattr(config, 'mg_totalmsgs'):           config.mg_totalmsgs      = ""
 if not hasattr(config, 'mg_newmsgs'):             config.mg_newmsgs        = ""
 if not hasattr(config, 'no_unsubscribe_str'):     config.no_unsubscribe_str = "Can't unsubscribe from mandatory area"
@@ -95,26 +115,26 @@ if not hasattr(config, 'unsub_from_str'):         config.unsub_from_str     = "U
 if not hasattr(config, 'sub_to_str'):             config.sub_to_str         = "Subscribed to |&1"
 if not hasattr(config, 'view_all_str'):           config.view_all_str       = 'All message bases'
 if not hasattr(config, 'view_sub_str'):           config.view_sub_str       = 'Subscribed message bases'
-if not hasattr(config, 'reader_initscreen'):      config.reader_initscreen = '|DFreader.ans|'
-if not hasattr(config, 'max_header_lines'):       config.max_header_lines  = 4
-if not hasattr(config, 'hdr_startpos'):           config.hdr_startpos      = '|[X01|[Y03|16'
-if not hasattr(config, 'hdr_str'):                config.hdr_str           = '|11| |&8|16|08|$T32|&1|$X38 |[X38|08|08|$T15|&2 |$X54 |[X54|08|08|&9|08|$T15|&3|$X69 |[X69|08|08|$T09|&4|[X78 |16 |08|'
-if not hasattr(config, 'hdr_str_new'):            config.hdr_str_new       = '|11| |&8|16|07|$T32|&1|$X38 |[X38|08|07|$T15|&2 |$X54 |[X54|08|07|&9|07|$T15|&3|$X69 |[X69|08|07|$T09|&4|[X78 |16 |08|'
-if not hasattr(config, 'hdr_str_selected'):       config.hdr_str_selected  = '|11| |&8|16|15|$T32|&1|08|$X38'+chr(250)+'|[X38|15|$T15|&2|08'+chr(250)+'|$X54'+chr(250)+'|[X54|15|&9|15|$T15|&3|08|$X69'+chr(250)+'|[X69|15|$T09|&4|08|[X78'+chr(250)+'|16 |08|'
-if not hasattr(config, 'hdr_str_unread'):         config.hdr_str_unread    = '|05>'
+#if not hasattr(config, 'reader_initscreen'):      config.reader_initscreen = '|CL|DFreader.ans|'
+#if not hasattr(config, 'max_header_lines'):       config2.getint('reader','max_header_lines')  = 4
+#if not hasattr(config, 'hdr_startpos'):           config.hdr_startpos      = '|[X01|[Y03|16'
+#if not hasattr(config, 'hdr_str'):                config.hdr_str           = '|11| |&8|16|08|$T32|&1|$X38 |[X38|08|08|$T15|&2 |$X54 |[X54|08|08|&9|08|$T15|&3|$X69 |[X69|08|08|$T09|&4|[X78 |16 |08|'
+#if not hasattr(config, 'hdr_str_new'):            config.hdr_str_new       = '|11| |&8|16|07|$T32|&1|$X38 |[X38|08|07|$T15|&2 |$X54 |[X54|08|07|&9|07|$T15|&3|$X69 |[X69|08|07|$T09|&4|[X78 |16 |08|'
+#if not hasattr(config, 'hdr_str_selected'):       config.hdr_str_selected  = '|11| |&8|16|15|$T32|&1|08|$X38'+chr(250)+'|[X38|15|$T15|&2|08'+chr(250)+'|$X54'+chr(250)+'|[X54|15|&9|15|$T15|&3|08|$X69'+chr(250)+'|[X69|15|$T09|&4|08|[X78'+chr(250)+'|16 |08|'
+#UNUSED if not hasattr(config, 'hdr_str_unread'):         config.hdr_str_unread    = '|05>'
 if not hasattr(config, 'hdr_clearstr'):           config.hdr_clearstr      = ' |$X77 '
-if not hasattr(config, 'hdr_bar_start'):          config.hdr_bar_start     = '|[X79|[Y03'
-if not hasattr(config, 'hdr_bar_low'):            config.hdr_bar_low       = '|16|08'+chr(176)
-if not hasattr(config, 'hdr_bar_high'):           config.hdr_bar_high      = '|16|11'+chr(178)
+#if not hasattr(config, 'hdr_bar_start'):          config.hdr_bar_start     = '|[X79|[Y03'
+#if not hasattr(config, 'hdr_bar_low'):            config.hdr_bar_low       = '|16|08'+chr(176)
+#if not hasattr(config, 'hdr_bar_high'):           config.hdr_bar_high      = '|16|11'+chr(178)
 if not hasattr(config, 'mid_first'):              config.mid_first       = "|16|03`------------------------------------------------------------------------------'"
-if not hasattr(config, 'mid_second'):             config.mid_second      = "|16|13::|05::                                                                        |05::|13::"
-if not hasattr(config, 'max_body_lines'):         config.max_body_lines            = 13
-if not hasattr(config, 'msg_body_startpos'):      config.msg_body_startpos         = '|[X01|[Y10'
+#if not hasattr(config, 'mid_second'):             config.mid_second      = "|16|13::|05::                                                                        |05::|13::"
+#if not hasattr(config, 'max_body_lines'):         config.max_body_lines            = 13
+#if not hasattr(config, 'msg_body_startpos'):      config.msg_body_startpos         = '|[X01|[Y10'
 if not hasattr(config, 'msg_body_clearstr'):      config.msg_body_clearstr         = '|16|[K'
 if not hasattr(config, 'msg_body_default'):       config.msg_body_default          = '|09'
 if not hasattr(config, 'msg_body_quote_highlight'):config.msg_body_quote_highlight  = '|05'
 if not hasattr(config, 'msg_body_low'):           config.msg_body_low              = '|08'
-if not hasattr(config, 'body_bar_start'):         config.body_bar_start            = '|[X71|[Y23'
+#if not hasattr(config, 'body_bar_start'):         config.body_bar_start            = '|[X71|[Y23'
 if not hasattr(config, 'msg_no_messages'):        config.msg_no_messages           = 'No messages in |&1 base found.' #|&1 base name
 if not hasattr(config, 'dialog_text_str'):        config.dialog_text_str           = '|15|23|&9|16' #|&9 is the displayed text
 if not hasattr(config, 'dialog_press_any_key'):   config.dialog_press_any_key      = '|15|23 [press any key]'
@@ -123,6 +143,16 @@ if not hasattr(config, 'delete_msg'):             config.delete_msg             
 #-- no edits beyong this point please!
 
 debug = False
+
+# Message base flags
+
+MB_RealNames   = 0x00000001  # 1
+MB_KillKludge  = 0x00000002  # 2
+MB_Autosigs    = 0x00000004  # 3
+MB_NoAttach    = 0x00000008  # 4
+MB_Private     = 0x00000010  # 5
+MB_PrivReply   = 0x00000020  # 6
+MB_AllowANSI   = 0x00000040  # 7
 
 ###################################################################################################################
 # Keys
@@ -187,6 +217,7 @@ def utf_to_ascii( s ):
         'cd':'|13', #magenta
         'ce':'|11',
         'cf':'|15',
+        'z0':'', #??
         'z1':'|16',
         'z2':'|18',
         'z3':'|22',        
@@ -203,6 +234,7 @@ def utf_to_ascii( s ):
         '\xe2\x96\x91':chr(176),
         '\xe2\x96\x92':chr(177),
         '\xe2\x96\x93':chr(178),
+        '\xe2\x96\xa0':chr(254), #square
         '\xe2\x80\x99':"'",
         '\xe2\x80\x90':'-',
         '\xe2\x80\x91':'-',
@@ -338,7 +370,7 @@ def utf_to_ascii( s ):
     for key in dictionary.keys():
         #p = re.compile(key,re.UNICODE)
         #s = re.sub(p,dictionary[key],s) #or #s = re.sub(key,dictionary[key],s)
-        s = re.sub(key,dictionary[key],s) #or #s = re.sub(key,dictionary[key],s)
+        s = re.sub(key,dictionary[key],s, flags=re.IGNORECASE) #or #s = re.sub(key,dictionary[key],s)
     
     return s
 #------------------------------------------------------------------------------
@@ -346,6 +378,65 @@ def utf_to_ascii( s ):
 ###################################################################################################################
 # Defs
 ###################################################################################################################
+
+
+#------------------------------------------------------------------------------
+class MyConfigParser(ConfigParser.RawConfigParser):
+    """ custom parse to make sure qoutes are trimmed """
+    def get(self, section, option):
+        val = ConfigParser.RawConfigParser.get(self, section, option)
+        if isinstance(val, (int, float)):
+            return val
+        return val.strip('"') #.strip("'")
+
+def load_config():
+    """ load config with backward compatibility to mystic a47 and lower """
+
+    global config2
+    global rjamdir
+    global datapath
+
+    config2 = MyConfigParser() #config2 = ConfigParser.SafeConfigParser()
+    #scriptdir = bbs.getcfg()['script']+'rjam'+os.sep    
+    #datapath = bbs.getcfg()['data']
+
+    # set default configurations
+    defaultcfg = rjamdir+'default.ini'
+    customcfg = rjamdir+'custom.ini'
+    defaultcfg_wide = rjamdir+'default.ini'
+    customcfg_wide = rjamdir+'custom.ini'
+
+    config2.read(defaultcfg)
+    config2.read(customcfg)
+
+    # test mystic 1.12a48 configuration capability
+    x, y = termsize()
+
+    try:
+        find_config('test','ini')
+    except AttributeError as e:
+        if os.path.exists(rjamdir+'default.c'+str(x)+'x'+str(y)+'.ini'):
+            defaultcfg_wide = rjamdir+'default.c'+str(x)+'x'+str(y)+'.ini'
+        elif os.path.exists(rjamdir+'default.c'+str(x)+'.ini'):
+            defaultcfg_wide = rjamdir+'default.c'+str(x)+'.ini'
+
+        if os.path.exists(rjamdir+'custom.c'+str(x)+'x'+str(y)+'.ini'):
+            customcfg_wide = rjamdir+'custom.c'+str(x)+'x'+str(y)+'.ini'
+        elif os.path.exists(rjamdir+'custom.c'+str(x)+'.ini'):
+            customcfg_wide = rjamdir+'custom.c'+str(x)+'.ini'    
+        pass
+    else:        
+        defaultcfg_wide = find_config(rjamdir+'default','ini')            
+        customcfg_wide = find_config(rjamdir+'custom','.ini')            
+
+    #only load when different to original configuration
+    if defaultcfg_wide != None and defaultcfg != defaultcfg_wide:
+        config2.read(defaultcfg_wide)
+
+    #only load when different to original configuration    
+    if customcfg_wide != None and customcfg != customcfg_wide:
+        config2.read(customcfg_wide)
+#------------------------------------------------------------------------------
 
 
 #------------------------------------------------------------------------------
@@ -402,39 +493,92 @@ def msgdialog(title,text,p=True):
 
 
 #------------------------------------------------------------------------------
-def updatebar(start_pos, index, total, height, vertical=True):
+def updatebar(start_pos, index, total, height, vertical=True, redraw=False):
+
+    if not hasattr(updatebar, 'bar_oldpos_x'):
+        updatebar.bar_oldpos_x = -1  # initialize once
+
+    if not hasattr(updatebar, 'bar_oldpos_y'):
+        updatebar.bar_oldpos_y = -1  # initialize once
+
+    #if 'bar_oldpos_x' not in globals():
+    #    bar_oldpos_x = -1
+    #if 'bar_oldpos_y' not in globals():
+    #    bar_oldpos_y = -1
 
     if vertical == True:
-      for i in range(0,height+1):
+      if redraw == True:
+        for i in range(0,height+1):
           pos = mci_adjust_y(start_pos,i)
-          write(pos+config.hdr_bar_low)
+          write(pos+config2.get('group','bar_low'))
       
       y = 0
       if total > 0: 
-          y = (index * (height + 1)) // total        
-      pos = mci_adjust_y(start_pos,y)        
-      write(pos+config.hdr_bar_high)
+          y = (index * (height)) // total    
+
+      if y < 0:
+        y == 0
+      
+      if y > height:
+          y = height
+
+      if updatebar.bar_oldpos_y <> y or redraw:
+        if updatebar.bar_oldpos_y != -1:
+          pos = mci_adjust_y(start_pos,updatebar.bar_oldpos_y)
+          write(pos+config2.get('group','bar_low'))
+
+        pos = mci_adjust_y(start_pos,y)        
+        write(pos+config2.get('group','bar_high'))
+
+      updatebar.bar_oldpos_y = y
 
     else:
 
       barlen = 6
       #(height // 2)
 
-      for i in range(0,barlen):
-          pos = mci_adjust_x(start_pos,i)
-          write(pos+config.hdr_bar_low)
+      
+      #total = total - height
+      #if total < height:
+      #  index = total
 
-      total = total - height
       if total < 1:
         x = barlen
       else:
-        x = (float(index) / float(total) ) * barlen
+        x = index * barlen // total
 
-      i = 0
-      while i < x:
-        pos = mci_adjust_x(start_pos,i)  
-        write(pos+config.hdr_bar_high)   
-        i += 1
+      #background
+      #for i in range(x,barlen):
+      if updatebar.bar_oldpos_x <> x or redraw:
+
+        i = 0
+        while i < barlen:
+          pos = mci_adjust_x(start_pos,i)
+          write(pos+config2.get('body','bar_low'))
+          i += 1
+
+        #for i in range(0,x):
+        i = 0
+        while i < x:
+          pos = mci_adjust_x(start_pos,i)  
+          write(pos+config2.get('body','bar_high')) 
+          i += 1
+          
+      """
+      #draw only difference
+      else:
+        if bar_oldpos_x > x:
+          pos = mci_adjust_x(start_pos,bar_oldpos_x)  
+          write(pos+config2.get('body','bar_low')) 
+        else:
+          #gotoxy(1,1)
+          #write(str(x)+' '+str(bar_oldpos_x)+' ')
+          pos = mci_adjust_x(start_pos,x)  
+          write(pos+config2.get('body','bar_high')) 
+      """
+
+      updatebar.bar_oldpos_x = x
+      #write(str(index)+' '+str(total))
 #------------------------------------------------------------------------------
 
 
@@ -532,6 +676,7 @@ def get_mailbases():
 
       #if message group exists
       if mg != None:
+  
         if access(mg['acs']):
 
           #add group to list
@@ -550,7 +695,7 @@ def get_mailbases():
 
             # if area exists
             if mb != None:
-
+                            
               if 'EMAILNETMAIL' in actions:
                 #if mb['id'] not in config.private_bases:
                 #double check! if we only mean netmail and email
@@ -564,6 +709,22 @@ def get_mailbases():
                 
                 mb['groupid'] = mg['id']
                 mailbases.append(mb)
+                
+                """
+                if issysop():
+                  if mb['id'] == 73:
+                    #         +     private
+                    #           +   public
+                    # 1 =  01010000 localmsg          MW
+                    # 27 = 01010100 netmail           MW
+                    # 73 = 01000100 general public    MP
+                    # 41 = 01000100 echo public       MP
+                    if bool(mb['flags'] & MB_Private):
+                      writeln('private')
+                      bits = bin(mb['flags'])[2:].zfill(8)
+                      writeln(bits)
+                      write('|PA')
+                """
 
               #if no group add area to start of list
               elif access(mb['listacs']) and group == -1:                            
@@ -584,7 +745,7 @@ def get_mailbases():
 # Message base functions
 ###################################################################################################################
 
-
+"""
 ###################################################################################################################
 # JAM vars
 ###################################################################################################################
@@ -779,7 +940,10 @@ def raw_get_msgs(jhrf):
               msg['msg_to'] = sf.Buffer
 
         # if not deleted or nulled (by editmsg in mystic)
-        if STATUSBITS["MSG_DELETED"] & msg['attribute'] == 0: # and msg['attribute'] != 0:
+        if (not bool(STATUSBITS['MSG_DELETED'] & msg['attribute']) 
+            and not bool(STATUSBITS['MSG_REMOVED'] & msg['attribute'])
+            and not bool(STATUSBITS['MSG_NODISP'] & msg['attribute'])
+        ): # and msg['attribute'] != 0:
           try:
             if user["handle"] == msg['msg_to'] or user["name"] == msg['msg_to']:
               count = count + 1
@@ -802,10 +966,7 @@ def count_msgs(file):
 
     jhrf.close()
     return count
-
-
-
-
+"""
 
 #------------------------------------------------------------------------------
 def get_new_mail_count(recount=False):
@@ -814,7 +975,7 @@ def get_new_mail_count(recount=False):
   global msgs
   global file
 
-  if 'YOU' in actions:
+  if 'YOU' in actions and not 'NEW' in actions:
     #show loading stats
     write('|#X#2##20#6#60#10#')
     write("|[X22|[Y08|15Indexing message bases, hold on .. ")
@@ -827,7 +988,8 @@ def get_new_mail_count(recount=False):
       
     #logerror(str(mailbase))
     #set this to make sure get_msgs knows what to do
-    user['mbase'] = base['id']
+    #TODO: THIS CAUSED ISSUES
+    #user['mbase'] = base['id']
 
     new = 0    
     total = 0
@@ -853,8 +1015,10 @@ def get_new_mail_count(recount=False):
       mailbases[i]['total'] = count
 
 
-    if 'NEW' not in actions and (mailbase['nettype'] == 0 or mailbase['nettype'] == 3 or 'YOU' in actions):
+    #if 'NEW' not in actions and (mailbase['nettype'] == 0 or mailbase['nettype'] == 3 or 'YOU' in actions):
+    if 'NEW' not in actions and (bool(mailbase['flags'] & MB_Private) or 'YOU' in actions):
       #if private/email/netmail or YOU count posts to user
+      #changed to IF PRIVATE
       if recount == False:          
 
         msg_seek(msgbase, -1) 
@@ -881,13 +1045,19 @@ def get_new_mail_count(recount=False):
 
     # get stats
     total, new, yours, lastpost = msg_stats(msgbase)
+    #gotoxy(2,2)
+    #write(str(msg_stats(msgbase)))
+    #write('|PN')
 
     # set stats
-    if mailbase['nettype'] == 0 or mailbase['nettype'] == 3: #or 'YOU' in actions:
-      mailbases[i]['new'] = yours
+    #if mailbase['nettype'] == 0 or mailbase['nettype'] == 3: #or 'YOU' in actions:
+    if bool(mailbase['flags'] & MB_Private):
+      mailbases[i]['new'] = yours #new is incorrect!
+      #mailbases[i]['total'] = total #removed to give accurate total when viewing own messages
     else:
       if 'YOU' in actions:
         mailbases[i]['new'] = yours
+        #mailbases[i]['total'] = total #removed to give accurate total when viewing own messages
       else:
         mailbases[i]['new'] = new
         mailbases[i]['total'] = total
@@ -934,7 +1104,7 @@ def purge_areas():
 
 #------------------------------------------------------------------------------
 def get_subscriptions():
-  global user
+  #global user
   global mailbases
 
   #loop indexed mailareas  
@@ -944,8 +1114,10 @@ def get_subscriptions():
     #if base['id'] != email_base:
     mailbase = getmbaseid(base['id'])
     
+    #TODO: WHAT ABOUT THIS?!
+    #DISABLED TO MAKE CHANGEAREA WORK WITHOUT CURRENT_MBASE
     #set this to make sure get_msgs knows what to do
-    user['mbase'] = base['id']
+    #user['mbase'] = base['id']
 
     if mailbase == None:
       msgdialog(' Error ','Msgbase not found!')
@@ -963,7 +1135,7 @@ def loadmainlist(count=False):
   global mailbases
   global mailgroups
   global viewmode
-  global user
+  #global user
 
   if count==False:
     get_mailbases()
@@ -992,7 +1164,15 @@ def loadmainlist(count=False):
           #add base   
           if 'ALL' in actions or viewmode == "ALL" or mailbases[j]['subbed'] > 0:          
             count += 1
-            areas.append({'subbed':mailbases[j]['subbed'],'total':mailbases[j]['total'],'new':mailbases[j]['new'],'id':mailbases[j]['id'],'name':mailbases[j]['name'],'type':'mbase','acs':mailbases[j]['listacs'],'target':str(mailbases[j]['id']),'desc':'','groupid':mailgroups[i]['id']})
+            #type>mbase
+            #acs>listacs
+            #groupid>id of group
+            #target>id of base
+            mailbases[j]['type'] = 'mbase'
+            mailbases[j]['group'] = mailgroups[i]
+            mailbases[j]['groupid'] = mailgroups[i]['id']
+            mailbases[j]['target'] = mailbases[j]['id']
+            areas.append(mailbases[j])
 
       #add group
       if count > 0:    
@@ -1007,7 +1187,10 @@ def loadmainlist(count=False):
 
         #add base
         if 'ALL' in actions or viewmode == "ALL" or mailbases[j]['subbed'] > 0:          
-          res.insert(0,{'subbed':mailbases[j]['subbed'],'total':mailbases[j]['total'],'new':mailbases[j]['new'],'id':mailbases[j]['id'],'name':mailbases[j]['name'],'type':'mbase','acs':mailbases[j]['listacs'],'target':str(mailbases[j]['id']),'desc':'','groupid':mailgroups[i]['id']})
+          mailbases[j]['type'] = 'mbase'
+          mailbases[j]['groupid'] = mailgroups[i]['id']
+          mailbases[j]['target'] = mailbases[j]['id']
+          res.insert(0,mailbases[j])
 
 
   return res
@@ -1114,6 +1297,7 @@ def read_msgbase_subscription(mbaseid, file):
   #close file
   jlrf.close()
 
+  #if no custom newscan found
   if newscan == -1:
     #try to find default value in mbase
     base = getmbaseid(mbaseid)
@@ -1152,6 +1336,15 @@ def write_msgbase_subscription(mbaseid, newscan):
 #------------------------------------------------------------------------------
 
 
+def onlyascii(char):
+    if ord(char) < 32 or ord(char) > 127: return ''
+    else: return char
+
+def get_my_string(data):
+    filtered_data=filter(onlyascii, data)
+    #filtered_data = filtered_data.lower()
+    return filtered_data
+
 #------------------------------------------------------------------------------
 def processmsg(msghdr):
   global user
@@ -1166,7 +1359,8 @@ def processmsg(msghdr):
   if msghdr['deleted'] == False and msghdr['from'] != '':
 
     # determine from/to only in netmail/email/private OR when YOU is selected
-    if mailbase['nettype'] == 0 or mailbase['nettype'] == 3 or 'YOU' in actions:
+    #if mailbase['nettype'] == 0 or mailbase['nettype'] == 3 or 'YOU' in actions:
+    if bool(mailbase['flags'] & MB_Private) or 'YOU' in actions:
       
       # only index subbed mailbases, for efficiency
       index = False
@@ -1185,39 +1379,13 @@ def processmsg(msghdr):
       add = True
 
 
-#    weird old code below, was I tripping:/
-#
-#    if "NEW" not in actions and "YOU" not in actions:
-#      add = True
-#   
-#    #if user['mbase'] in config.private_bases:
-#    if mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
-#        add = False
-#
-#        #both from/to name/handle are added
-#        if 'NOFROM' in actions:
-#          if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper():
-#            add = True        
-#        else:
-#          if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['from'].upper() or user["handle"].upper() == msghdr['from'].upper():
-#            add = True
-#
-#    #if only show mail to you (undo previous set add flag)
-#    if "YOU" in actions:
-#      if 'NOFROM' in actions:
-#        if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper():
-#          add = True 
-#      else:
-#        if user["handle"].upper() == msghdr['to'].upper() or user["name"].upper() == msghdr['to'].upper() or user["handle"].upper() == msghdr['from'].upper() or user["name"].upper() == msghdr['from'].upper():
-#          add = True
-
     if add == True:
 
       msg['msg_date']     = TimeStr(msghdr['date'])
       msg['msg_number']   = msghdr['number']
-      msg['msg_subject']  = msghdr['subj']
-      msg['msg_from']     = msghdr['from']
-      msg['msg_to']       = msghdr['to']
+      msg['msg_subject']  = re.sub(r'\s+', ' ',get_my_string(msghdr['subj']))
+      msg['msg_from']     = re.sub(r'\s+', ' ',get_my_string(msghdr['from'])).strip()
+      msg['msg_to']       = re.sub(r'\s+', ' ',get_my_string(msghdr['to'])).strip()
 
       return msg, True
 
@@ -1237,6 +1405,7 @@ def load_prevmsg(index):
     while msg_found(msgbase) and not shutdown():      
       msghdr = msg_gethdr(msgbase)
       msg, add = processmsg(msghdr)
+
       if add:
         if len(msgs) == 0 or msgs[0]['msg_number'] <> msg['msg_number']:
           msgs.insert(0,msg)
@@ -1262,6 +1431,7 @@ def load_nextmsg(index):
       msghdr = msg_gethdr(msgbase)
       tmpid = int(msghdr['number'])
       msg, add = processmsg(msghdr)
+
       if add:
         if len(msgs) == 0 or msgs[len(msgs)-1]['msg_number'] <> msg['msg_number']:
           msgs.append(msg)
@@ -1280,6 +1450,8 @@ def get_msgs(index=-1):
     global msg_lastID
     global msgbase
     
+    global hdrlines 
+
     msgs      = []
     msg_count = 0
     msg_index = 0 
@@ -1306,11 +1478,14 @@ def get_msgs(index=-1):
         msg_prev(msgbase)
    
     count = 0
-    while msg_found(msgbase) and count <= 10 and not shutdown():
+    while msg_found(msgbase) and count <= hdrlines and not shutdown():
       msghdr = msg_gethdr(msgbase)    
       msg, add = processmsg(msghdr)
+      #set mbaseid in msg for dynamic headers
+      #msg['mbase'] = mbaseid
+
       if add:
-        if len(msgs) == 0 or msgs[0]['msg_number'] <> msg['msg_number']:          
+        if len(msgs) == 0 or msgs[0]['msg_number'] <> msg['msg_number']:
           msgs.insert(0,msg)
           msg_count += 1
           count += 1
@@ -1319,9 +1494,12 @@ def get_msgs(index=-1):
     ## read messages forward
     msg_seek(msgbase, index) 
     count = 0
-    while msg_found(msgbase) and count <= 10 and not shutdown():
+    while msg_found(msgbase) and count <= hdrlines and not shutdown():
       msghdr = msg_gethdr(msgbase)
       msg, add = processmsg(msghdr)
+      #set mbaseid in msg for dynamic headers
+      #msg['mbase'] = mbaseid
+
       if add:
         if len(msgs) == 0 or msgs[len(msgs)-1]['msg_number'] <> msg['msg_number']:
           msgs.append(msg)
@@ -1365,6 +1543,7 @@ def get_msg_body(index,msg,echohdr=False):
     return msgbody
 #------------------------------------------------------------------------------
 
+
 #------------------------------------------------------------------------------
 def index_msgs(mbaseid,index=-1):
     global cfg
@@ -1374,6 +1553,10 @@ def index_msgs(mbaseid,index=-1):
     global msgbase
 
     base = getmbaseid(mbaseid)
+    #gotoxy(1,1)
+    #writeln(str(base))
+    #write('|PA')
+    
 
     if user == None:
         msgdialog(' Error ','User not found!')
@@ -1388,7 +1571,7 @@ def index_msgs(mbaseid,index=-1):
     
     #this could cause issues if private base has some extended acs requirements
     #if access(base['listacs']) or mbaseid in config.private_bases:
-    if access(base['listacs']) or base['nettype'] == 0:
+    if access(base['listacs']) or (base['nettype'] == 0 and bool(base['flags'] & MB_Private)):
       msgbase = msg_open(file)
       get_msgs(index)
 #------------------------------------------------------------------------------
@@ -1420,7 +1603,7 @@ def mci_adjust_y(s,i=0):
 
 #------------------------------------------------------------------------------
 def mci_adjust_x(s,i=0):
-  for match in re.findall(r'\|\[X([0-9]{2})', s):
+  for match in re.findall(r'\|\[X([0-9]{2,3})', s):
     pos = int(match)
     pos += i
     s = s.replace('|[X'+match, '|[X'+str(pos).zfill(2)) 
@@ -1441,7 +1624,7 @@ def mci_extract_y(s):
 
 #------------------------------------------------------------------------------
 def mci_extract_x(s):
-  for match in re.findall(r'\|\[X([0-9]{2})', s):
+  for match in re.findall(r'\|\[X([0-9]{2,3})', s):
     pos = int(match)
     return pos
 
@@ -1453,21 +1636,134 @@ def mci_extract_x(s):
 # Draw message body
 ##########################################################################################################################
 
+def color_code_to_ansi(input_string, combine_space=False, lastfgcolor=None, lastbgcolor=None, lastintensity=None):
+
+    #global last_applied_bg, last_applied_intensity
+    # ANSI color codes mapping
+    foreground_colors = {
+        "00": "30", "01": "34", "02": "32", "03": "36", "04": "31", "05": "35",
+        "06": "33", "07": "37", "08": "30", "09": "34", "10": "32", "11": "36",
+        "12": "31", "13": "35", "14": "33", "15": "37"
+    }
+
+    background_colors = {
+        "16": "40", "17": "44", "18": "42", "19": "46", "20": "41", "21": "45",
+        "22": "43", "23": "47"
+    }
+
+    # Regex to find color codes
+    color_pattern = re.compile(r"\|(\d{2})")
+
+    # Initialize default colors
+    current_fg = lastfgcolor
+    current_bg = lastbgcolor
+    current_intensity = lastintensity  # Default intensity is normal
+    #last_applied_bg = lastbgcolor #"40"
+    #last_applied_intensity = lastintensity
+    result = ""
+    buffer = ""
+
+    def apply_color(fg, bg, intensity):
+        """Generate ANSI code based on current foreground, background, and intensity."""
+        #global last_applied_bg, last_applied_intensity
+
+        parts = []
+        #if intensity and intensity != last_applied_intensity:
+
+        if intensity != None:
+          parts.append(intensity)
+        #last_applied_intensity = intensity
+        #if fg:
+        if fg != None:
+          parts.append(fg)
+        #if bg and bg != last_applied_bg:
+
+        if bg != None:
+          parts.append(bg)
+
+        #last_applied_bg = bg
+        #if parts == None:
+        #write(str(parts))
+        if intensity or fg or bg:
+          return "\033[" + ";".join(parts) + "m" #if parts else ""
+        
+        return ""
+
+    def replace_spaces_with_cursor_move(text):
+        """Replace multiple spaces with ANSI cursor movement."""
+        def space_replacer(match):
+            spaces = len(match.group(0))
+            return "\033[{}C".format(spaces)
+
+        return re.sub(r" {3,}", space_replacer, text)
+
+    # Parse the input string
+    for i, part in enumerate(re.split(r"(\|\d{2})", input_string)):
+        next_char_index = input_string.find(part) + len(part)
+        next_char = input_string[next_char_index:next_char_index + 1] if next_char_index < len(input_string) else ""
+
+        if color_pattern.match(part):
+            color_code = part[1:]
+
+            if color_code in foreground_colors:
+                fg_ansi = foreground_colors[color_code]
+
+                new_intensity = "1" if int(color_code) >= 8 else "0"  # High intensity for codes 8-15
+                if fg_ansi != current_fg or new_intensity != current_intensity:
+                    # Flush buffer with the current color if fg or intensity changes
+                    if buffer:
+                        result += apply_color(current_fg, current_bg, current_intensity) + buffer
+                        buffer = ""
+                    current_fg = fg_ansi
+                    current_intensity = new_intensity
+            elif color_code in background_colors:
+                bg_ansi = background_colors[color_code]
+                if bg_ansi != current_bg:
+                    # Flush buffer with the current color if bg changes
+                    if buffer:
+                        result += apply_color(current_fg, current_bg, current_intensity) + buffer
+                        buffer = ""
+                    current_bg = bg_ansi
+        else:
+            # Replace multiple spaces with cursor movement
+            if combine_space:
+              part = replace_spaces_with_cursor_move(part)
+
+            # Add text to buffer
+            buffer += part
+
+    # Flush any remaining buffer
+    if buffer:
+        result += apply_color(current_fg, current_bg, current_intensity) + buffer
+
+    #removed +'\n'
+    return result, current_fg, current_bg, current_intensity
+
+
 #------------------------------------------------------------------------------
 def multiple_replace(string, rep_dict):
     pattern = re.compile("|".join([re.escape(k) for k in sorted(rep_dict,key=len,reverse=True)]), flags=re.DOTALL)
     return pattern.sub(lambda x: rep_dict[x.group(0)], string)
 #------------------------------------------------------------------------------
 
+
 #------------------------------------------------------------------------------
 def draw_msg_body(msg,index,top=0,dumpquote=False,echohdr=False):
-  global msgtext
-  global msglines
+  
   global old_body_top
   global cfg
   global user
   global debug
 
+  #required to avoid loading drawmsg on each call
+  #todo: move body to msgs['body']
+  global msgtext
+  global msglines
+  global plaintext
+
+  #msglines = None
+
+  ansitext = False
   #get quote name (first two letters or if spaces first two word letters)
   #used for message quote dump
   quote_to    = get_quote_from_name(msg['msg_to'])
@@ -1479,96 +1775,213 @@ def draw_msg_body(msg,index,top=0,dumpquote=False,echohdr=False):
 
     msgtext = get_msg_body(index,msg,echohdr)
     msgtext = multiple_replace(msgtext, config.rep)
+    #instead of here we do that on drawing
+    #msgtext = color_code_to_ansi(msgtext,False)[0]
     msgtext = utf_to_ascii( msgtext )
 
+    #fixes cnet color string lengths, loses body
+    
+    #bugfix, this makes cnet color codes to mci fix strln
+    #to show only two colors
+    #msgtext = stripmcicolor(msgtext)
     if ansi_escape.search(msgtext) != None:
-      msgtext = ansi2mci(msgtext,dumpquote)
+        ansitext = True
+
+    if ansitext:
+      msgtext, plaintext = ansi2mci(msgtext,dumpquote)
+      newtext = []
+      fgcolor = None
+      bgcolor = None
+      intensity = None
+      for line in msgtext:
+        tmpline,fgcolor, bgcolor, intensity = color_code_to_ansi(line, False, fgcolor, bgcolor, intensity)
+        newtext.append(tmpline)
+        #newtext.append(line)
+
+      msgtext = newtext
+      #msgtext = ""
       #msgtext = ansi2mci('/mystic/themes/default/text/test1.ans',dumpquote,True)    
       #msgtext = ansi2mci('/mystic/themes/default/text/ungenannt-darkness.ans',dumpquote,True)
     else:
       msgtext = msgtext.splitlines()
-
+      
       splittext = []
       for i in range(len(msgtext)):
 
-        count = 0
-        prefix = ""
-        if msgtext[i].strip()[:15].rfind('>') > -1:
-          prefix = msgtext[i][:msgtext[i][:15].rfind('>') + 1] + ' '
-
-        #truncate and add quotemarks where needed
-        while len(msgtext[i]) > 80:          
-          spacepos = msgtext[i][:80].rfind(' ')
-          if spacepos < (80 - 20) or spacepos == -1:
-            spacepos = 79
-
-          if count == 0:
-            splittext.append( msgtext[i][:spacepos] )
-          else:
-            splittext.append( prefix + msgtext[i][:spacepos] )
-          msgtext[i] = str(msgtext[i][spacepos+1:])
-
-          count += 1
-
-        if count > 0:
-          splittext.append( prefix + msgtext[i])
-        else:
+        if len(stripmcicolor(msgtext[i])) < 79:
           splittext.append( msgtext[i])
+        else:
+          # try to truncate
+          count = 0
+          prefix = ""
+          if msgtext[i].strip()[:15].rfind('>') > -1:
+            prefix = msgtext[i][:msgtext[i][:15].rfind('>') + 1] + ' '
+
+          #truncate and add quotemarks where needed
+          while len(msgtext[i]) > 80:          
+            spacepos = msgtext[i][:80].rfind(' ')
+            if spacepos < (80 - 20) or spacepos == -1:
+              spacepos = 79
+
+            if count == 0:
+              splittext.append( msgtext[i][:spacepos] )
+            else:
+              splittext.append( prefix + msgtext[i][:spacepos] )
+            msgtext[i] = str(msgtext[i][spacepos+1:])
+
+            count += 1
+
+          if count > 0:
+            splittext.append( prefix + msgtext[i])
+          else:
+            splittext.append( msgtext[i])
 
       msgtext = splittext
 
+      #convert each line to plaintext
+      plaintext = []
+      for line in msgtext:
+        plaintext.append(stripmcicolor(line))
+
     msglines = len(msgtext)
-  
+
   if dumpquote == True:
     
     #dump body as quote
     msgtmpf = cfg['temp']+'msgtmp'
     f = open(msgtmpf,'w')
     for i in range(len(msgtext)):
-      f.write(' '+quote_from+'> '+stripmcicolor(msgtext[i])+'\r')
+        
+      if not ansitext:
+        #add newline
+        f.write(' '+quote_from+'> '+stripmcicolor(msgtext[i])+'\r')
+      else:
+        f.write(' '+quote_from+'> '+msgtext[i])
+        #f.write(' '+quote_from+'> '+color_code_to_ansi(msgtext[i])[0])
     return 
 
   else:
-        
+          
     #draw body
-    if top >= msglines-config.max_body_lines:
-      top = msglines-config.max_body_lines
+    if top >= msglines-config2.getint('body','max_body_lines'): #config.max_body_lines:
+      top = msglines-config2.getint('body','max_body_lines')
 
     if top < 0:
       top = 0
 
-    updatebar(config.body_bar_start, top, msglines, config.max_body_lines, False)
 
     if old_body_top <> top:
+      updatebar.bar_oldpos_x = -1
+      updatebar(config2.get('body','body_bar_start'), top, msglines-config2.getint('body','max_body_lines'), config2.getint('body','max_body_lines'), False)
 
-      start_y = mci_extract_y(config.msg_body_startpos + config.msg_body_default)  
+      start_y = mci_extract_y(config2.get('body','msg_body_startpos'))
+      start_x = mci_extract_x(config2.get('body','msg_body_startpos'))
+      #this was to make sure msg_body_startpos works without |[Yxx
+      #start_y = mci_extract_y(mci_adjust_y(config2.get('reader','startpos'),config2.getint('reader','max_header_lines')+3))
+
+      #calculate offset when bodylines < max_bodylines
+      offset = 0
+      if config2.getboolean('body','center_message'):
+        if msglines < config2.getint('body','max_body_lines'):
+          offset = (config2.getint('body','max_body_lines')-msglines) / 2
+          start_y += offset
+          #clear lines up to offet
+          for i in range(0,offset):
+            gotoxy(start_x,start_y+i-offset)
+            write(config.msg_body_clearstr)
+      
+
       old_body_top = top
 
       j = 0
-      while j<config.max_body_lines and start_y != -1:
+      while j<config2.getint('body','max_body_lines')-offset and start_y != -1:
 
-        pos = mci_adjust_y(config.msg_body_startpos + config.msg_body_default,j)      
-        write(pos)
+        #posy = mci_extract_y(config.msg_body_startpos,j)      
+        gotoxy(start_x,start_y+j)
+        #write(pos)
+
+        #write(config.msg_body_default)
+        #gotoxy(1, start_y+j+top)
         
         # draw msg body
         if j+top<msglines:
 
+          plain = False
+          trim = False
+          
           # check if highlight variations
-          if msgtext[j+top].strip()[:3].find('>') > -1:
+          if j == 0 and plaintext[j+top].strip()[:3].upper().find('-=>') == 0:
+            write(config.msg_body_low)
+            plain = True
+            #trim = True
+          elif plaintext[j+top].strip()[:3].find('>') > -1:
             write(config.msg_body_quote_highlight)
-          elif j == 0 and msgtext[j+top].strip()[:3].upper().find('ON ') == 0:
+            plain = True
+          elif j == 0 and plaintext[j+top].strip()[:3].upper().find('ON ') == 0:
             write(config.msg_body_low)
-          elif j+top > msglines-3 and msgtext[j+top].strip()[:4].find('---') > -1:
+            plain = True
+          elif j < 3 and plaintext[j+top].strip()[:3].upper().find('BY:') in [0,1]:
             write(config.msg_body_low)
-          elif j+top > msglines-5 and msgtext[j+top].strip()[:4].find('...') > -1:
+            plain = True
+            trim = True
+          elif j < 2 and plaintext[j+top].strip()[:3].upper().find('RE:') in [0]:
             write(config.msg_body_low)
-          elif j+top > msglines-4 and msgtext[j+top].strip()[:4].find('===') > -1:
+            plain = True
+            trim = True
+          elif j < 2 and plaintext[j+top].strip()[:17].upper().find('QUOTING MESSAGE ') > -1:
             write(config.msg_body_low)
-          elif j+top > msglines-2 and msgtext[j+top].strip()[:2].find('* ') > -1:
+            plain = True
+          elif j == 1 and plaintext[j+top].strip()[:3].upper().find('ON ') == 0:
             write(config.msg_body_low)
+            plain = True
+          elif j+top > msglines-3 and plaintext[j+top].lstrip()[:4].find('---') > -1:
+            write(config.msg_body_low)
+            plain = True
+          elif j+top > msglines-4 and plaintext[j+top].lstrip()[:4].find('--- ') > -1:
+            write(config.msg_body_low)
+            plain = True
+          elif j+top > msglines-4 and plaintext[j+top].lstrip()[:4].find('*** ') > -1:
+            write(config.msg_body_low)
+            plain = True
+          elif j+top > msglines-4 and plaintext[j+top].lstrip()[:4].find('[+] ') > -1:
+            write(config.msg_body_low)
+            plain = True
+          elif j+top > msglines-6 and plaintext[j+top].lstrip()[:4].find(chr(254)) > -1:
+            write(config.msg_body_low)
+            plain = True
+          elif j+top > msglines-6 and plaintext[j+top].lstrip()[:4].find('... ') > -1:
+            write(config.msg_body_low)
+            plain = True
+          elif j+top > msglines-4 and plaintext[j+top].lstrip()[:4].find('=== ') > -1:
+            write(config.msg_body_low)
+            plain = True
+          elif j+top > msglines-6 and plaintext[j+top].lstrip()[:2].find('* ') > -1:
+            write(config.msg_body_low)
+            plain = True
+          else:
+            write(config.msg_body_default)
 
+            #TODO: add OR only alpha numeric chars
+            #if is_unicode_alnum_or_punct(plaintext[j+top]):
+            #  plain = True
+            if ansi_escape.search(msgtext[j+top]) == None: 
+              if len(stripmcicolor(msgtext[j+top])) == len(msgtext[j+top]):
+                plain = True
+          
           #if j+top<msglines-5:
-          pwrite(msgtext[j+top])
+
+          #if forced plaintext
+          #or length plaintext equals msgtext
+          if plain: # or (not ansitext and len(stripmcicolor(msgtext[j+top])) == len(msgtext[j+top])):
+            if trim:
+              rwrite(stripmcicolor(plaintext[j+top][:80]).lstrip())
+            else:
+              rwrite(stripmcicolor(plaintext[j+top][:80]))
+          else:
+            #rwrite(msgtext[j+top])
+            pwrite(color_code_to_ansi(msgtext[j+top],False)[0])
+            #write(' ')
+            #write(config.msg_body_clearstr)  
           #else:
           #  write(msgtext[j+top])
 
@@ -1578,6 +1991,7 @@ def draw_msg_body(msg,index,top=0,dumpquote=False,echohdr=False):
 
         j+=1
 
+  #msg_text = None
   return top
 #------------------------------------------------------------------------------
 
@@ -1585,16 +1999,42 @@ def draw_msg_body(msg,index,top=0,dumpquote=False,echohdr=False):
 # Defs
 ######################################################################################################################
 
+def find_display_custom( filepath ):
+    """ load ansi file with backwards compatibility for mystic a47 or lower """    
+    try:
+      find_display('test')
+    except AttributeError as e:
+        
+        x, y = bbs.termsize();
+
+        base = filepath[:-4] 
+
+        if os.path.exists(base + '.c' + str(x) + 'x' + str(y) + '.ans'):
+            return base + '.c' + str(x) + 'x' + str(y) + '.ans'
+        elif os.path.exists(base + '.c' + str(x) + '.ans'):
+            return base + '.c' + str(x) + '.ans'
+        else:
+            return filepath
+
+    else:        
+        return find_display( filepath[:-4] )            
+
 
 #------------------------------------------------------------------------------
 def drawbackground():
-  write(config.clearscr + config.reader_initscreen)  
+  
+  reader_ansi = find_display_custom(rjamdir+config2.get('ansi','reader'))
+  showfile(reader_ansi,0,0,0,0)
+    
+  #write(config.reader_initscreen)  
 #------------------------------------------------------------------------------
-
 
 #------------------------------------------------------------------------------
 def drawtreelist():
-  write(config.mg_initscreen)
+  #write('|16|CL')
+  group_ansi = find_display_custom(rjamdir+config2.get('ansi','group'))
+  showfile(group_ansi,0,0,0,0)
+  #write(config.mg_initscreen)
 #------------------------------------------------------------------------------
 
 
@@ -1606,6 +2046,7 @@ def drawtreelist():
 def set_area():
     global items
     global actions
+    global user
 
     i = 0    
     selbar = 0
@@ -1614,8 +2055,14 @@ def set_area():
 
     # set mbase according to initial (or returning group)
     while i<len(items) and found == False:
-      if items[i]['type'] != 'group':        
-        if (items[i]['new'] != 0 and 'NEW' in actions) or ('NEW' not in actions and int(items[i]["target"]) == int(current_mbase)):
+      if items[i]['type'] != 'group':
+        #TODO: global user and use user['mbase'] instead! besides, current_mbase wasnt defined as global?!
+        #if (items[i]['new'] != 0 and 'NEW' in actions) or ('NEW' not in actions and int(items[i]["target"]) == int(current_mbase)):
+        if (items[i]['new'] != 0 and 'NEW' in actions) or ('NEW' not in actions and int(items[i]["target"]) == int(user['mbase'])):
+        #gotoxy(1,2)
+        #writeln(str(user['mbase']))
+        #write('|PA')
+        #if (items[i]['new'] != 0 and 'NEW' in actions) or ('NEW' not in actions and int(items[i]["target"]) == 13):
           #wrinteln(str(actions))
           selbar = i
           found = True
@@ -1627,16 +2074,16 @@ def set_area():
         selbar += 1
     
     #adjust top to selbar position
-    if selbar >= config.mg_max_lines:      
-      top = selbar - config.mg_max_lines; 
+    if selbar >= config2.getint('group','max_lines'): #config.mg_max_lines:      
+      top = selbar - config2.getint('group','max_lines') 
 
     #adjust top to end in middle of available space
-    if selbar > (config.mg_max_lines / 2 ):
-      top = selbar - ( config.mg_max_lines / 2 );
+    if selbar > (config2.getint('group','max_lines') / 2 ):
+      top = selbar - ( config2.getint('group','max_lines') / 2 );
 
     #make sure no gap at bottom
-    if selbar > len(items)-config.mg_max_lines:
-      top = len(items) - config.mg_max_lines
+    if selbar > len(items)-config2.getint('group','max_lines'):
+      top = len(items) - config2.getint('group','max_lines')
 
     if top < 0:
       top = 0
@@ -1677,13 +2124,13 @@ def key_down(selbar, top):
   else:
       while items[selbar]['type'] == 'group' and selbar < len(items) - 1:
           selbar +=1
-          if selbar-top > config.mg_max_lines - 1:
+          if selbar-top > config2.getint('group','max_lines') - 1:
               top += 1
       #precaution if last pos is an group
       while items[selbar]['type'] == 'group' and selbar > 0:
           selbar -= 1
 
-  if selbar-top > config.mg_max_lines - 1:
+  if selbar-top > config2.getint('group','max_lines') - 1:
       top += 1
 
   return selbar, top
@@ -1692,33 +2139,23 @@ def key_down(selbar, top):
 
 #------------------------------------------------------------------------------
 def treelist():
-    global current_mbase
+    #global current_mbase
+    global rjamdir
     global last_msg_num
     global user
     global items
     global msg_count
+    global msgs
     global viewmode
     global mailbase
+    global mailbases
+
+    current_group_id = None
 
     #search_txt = ''
     #search_x = 12
     #search_y = 23
     #search_cl= 8
-
-    def updatebar(start_pos, index, total, height, vertical=True):
-      
-      if vertical == True:
-
-        for i in range(0,height):
-            pos = mci_adjust_y(start_pos,i)
-            write(pos+config.mg_bar_low)
-        
-        y = 0
-        if total > 0: 
-            y = (index * (height )) // total        
-        pos = mci_adjust_y(start_pos,y)        
-        write(pos+config.mg_bar_high)
-
 
     if len(items)<1:
       return -1
@@ -1727,15 +2164,46 @@ def treelist():
     #value = -1
     done = False
 
-    start_y     = mci_extract_y(config.mg_startpos)
+    start_y     = mci_extract_y(config2.get('group','startpos')) #config.mg_startpos)
+    #gotoxy(1,4)
+    #writeln(str(user['mbase'])+"  ")
+    #write('|PA')    
     selbar, top = set_area()
 
     oldtop = -1
     oldbar = -1
     redraw = True
+    redraw_bg = True
 
     menucmd('NA','rJAM - Viewing Mailbases')
     sysoplog(1,'rJAM - Viewing Mailbases')
+
+
+    #go straight to mailbase if only one base newmail!
+    if(len(mailbases)) == 1:
+      #gotoxy(1,1)
+      #write(str(mailbases))
+      #write('|PN')
+      write('|CL')
+
+      menucmd('MG',str(mailbases[len(mailbases)-1]['groupid']))
+      menucmd('MA',str(mailbases[len(mailbases)-1]['id']))
+
+      mailbase = getmbaseid(mailbases[len(mailbases)-1]['id'])        
+      index_msgs(mailbases[len(mailbases)-1]['id'])
+      last_msg_num = get_last_read_msg_num()
+      #maillist(items[len(items)-1]['id'], items[len(items)-1]['total'], items[len(items)-1]['new'])
+      # get stats
+      #total, new, yours, lastpost = msg_stats(msgbase) 
+      #TODO: update user['mbase']
+      maillist(mailbases[len(mailbases)-1]['id'],mailbases[len(mailbases)-1]['total'],mailbases[len(mailbases)-1]['new'])
+      #maillist(mailbases[len(mailbases)-1]['id'],len(msgs),mailbases[len(mailbases)-1]['new'])
+      return
+
+      #stuffkey(chr(13))
+      #gotoxy(1,1)
+      #write('hello|PA')
+    
 
     while done == False and not shutdown():
 
@@ -1747,25 +2215,28 @@ def treelist():
           menucmd('MA',str(items[selbar]['id']))
         
         user['mbase'] = items[selbar]['id']   
-        current_mbase = items[selbar]['id']   #for when we return
+        #current_mbase = items[selbar]['id']   #for when we return
+
+        if redraw_bg == True:
+            drawtreelist()
+            redraw_bg = False
 
         #should add oldpos/selbar to redraw
         if oldbar <> selbar or oldtop <> top or redraw == True:
-
-          if redraw == True:
-            drawtreelist()
-            redraw = False
+  
+          redraw = False
 
           oldbar = selbar
           oldtop = top
-
+            
           #update scrollbar
-          updatebar(config.mg_bar_start, selbar, len(items), config.mg_max_lines)
+          #updatebar(config2.get('group','bar_start'), selbar, len(items), config2.getint('group','max_lines'), False)
+          updatebar(config2.get('group','bar_start'), selbar+1, len(items), config2.getint('group','max_lines'), False, redraw)
 
           y = top
-          while y-top<=config.mg_max_lines - 1:
+          while y-top<=config2.getint('group','max_lines') - 1:
 
-              pos = mci_adjust_y(config.mg_startpos,y-top)                    
+              pos = mci_adjust_y(config2.get('group','startpos'),y-top)                    
 
               if y<len(items):
                   
@@ -1799,15 +2270,15 @@ def treelist():
                         setpinfo(3, str(items[y]['new']))                      
 
                   #default display string
-                  s = config.mg_str_area
+                  s = config2.get('group','area') #config.mg_str_area
 
                   #group display string
                   if items[y]['type'] == 'group':
-                      s = config.mg_str_group
+                      s = config2.get('group','group') #config.mg_str_group
 
                   #highlight display string
                   elif selbar == y:
-                    s = config.mg_str_highlight        
+                    s = config2.get('group','area_high') #config.mg_str_highlight        
 
                     #additional messages if we want    
                     if items[y]['type'] == 'mbase':                        
@@ -1829,9 +2300,57 @@ def treelist():
                    #fill empty
                    #need to test this!
                   write(pos)
-                  write(config.mg_str_empty)
+                  write(config2.get('group','str_empty'))
 
               y += 1            
+
+          #draw logo group
+          if config2.getboolean('group','show_logo') and items[selbar]['groupid'] <> current_group_id:
+            
+            #if issysop():
+            #  mailbase = getmbaseid(items[selbar]['id'])
+            #  writeln('   '+str(mailbase)+'|PN')
+            #  writeln('   '+str(cfg)+'|PN')
+            
+
+            groupname = ''.join(filter(str.isalnum, items[selbar]['group']['name'].lower()))
+            ansi_file = find_display_custom(rjamdir+'art-group_'+groupname+'.ans')
+
+            if ansi_file == None:
+              ansi_file = find_display_custom(rjamdir+'group'+str(items[selbar]['groupid'])+'.ans')
+
+            if ansi_file != None:
+
+              ansi_data, ansi_plain = ansi2mci(ansi_file, False, True)
+              current_group_id = items[selbar]['groupid']
+
+              start_y_ansi = mci_extract_y(config2.get('body','msg_body_startpos'))
+              start_x_ansi = mci_extract_x(config2.get('body','msg_body_startpos'))
+
+              #calculate offset when bodylines < max_bodylines
+              offset = 0
+              if config2.getboolean('body','center_message'):
+                if len(ansi_data) < config2.getint('body','max_body_lines'):
+                  offset = (config2.getint('body','max_body_lines')-len(ansi_data)) / 2
+                  start_y_ansi += offset
+                  #clear lines up to offet
+                  for i in range(0,offset):
+                    gotoxy(start_x_ansi,start_y_ansi+i-offset)
+                    write(config.msg_body_clearstr)
+              
+              #gotoxy(50,16)
+              #write('|14'+str(current_group_id)+' '+ansi_file+' '+str(len(ansi_data)))
+              #write(str(ansi_data))
+              for i in range(0,len(ansi_data)):
+                gotoxy(start_x_ansi,start_y_ansi+i)
+                write(ansi_data[i])
+
+              for i in range(len(ansi_data),config2.getint('body','max_body_lines')):
+                gotoxy(start_x_ansi,start_y_ansi+i)
+                write(config.msg_body_clearstr)
+
+
+
 
         #get keypress
         key, extended = getkey()       
@@ -1882,28 +2401,28 @@ def treelist():
                     selbar = tmppos
 
               #adjust top
-              if selbar > top + config.mg_max_lines - 1:
-                  top = selbar - config.mg_max_lines + 1
+              if selbar > top + config2.getint('group','max_lines') - 1:
+                  top = selbar - config2.getint('group','max_lines') + 1
              
 
           elif key == KEY_PGUP:
-              selbar = selbar - config.mg_max_lines
+              selbar = selbar - config2.getint('group','max_lines')
               if selbar < 0:
                 selbar = 0
               while items[selbar]['type'] == 'group':
                 selbar +=1          
                 
-              top = top - config.mg_max_lines
+              top = top - config2.getint('group','max_lines')
               if top < 0:
                 top = 0
 
           elif key == KEY_PGDN:
-              selbar = selbar + config.mg_max_lines
+              selbar = selbar + config2.getint('group','max_lines')
               if selbar > len(items)-1:
                   selbar = len(items)-1
-              top = top+config.mg_max_lines
-              if top > len(items)-config.mg_max_lines:
-                  top = len(items)-config.mg_max_lines
+              top = top+config2.getint('group','max_lines')
+              if top > len(items)-config2.getint('group','max_lines'):
+                  top = len(items)-config2.getint('group','max_lines')
                   if top < 0:
                       top = 0
               if items[selbar]['type'] == 'group' and selbar < len(items) -1:
@@ -1917,8 +2436,8 @@ def treelist():
 
           elif key == KEY_END:
               selbar=len(items)-1
-              if len(items)-config.mg_max_lines > 0:
-                  top = len(items)-config.mg_max_lines
+              if len(items)-config2.getint('group','max_lines') > 0:
+                  top = len(items)-config2.getint('group','max_lines')
               else:
                   top = 0
               if items[selbar]['type'] == 'group':
@@ -1939,20 +2458,25 @@ def treelist():
                       
         else:
           key = key.upper()          
-          if key == KEY_ENTER:
+          if key == KEY_ENTER or key == KEY_TAB:
               
               if "AREASELECT" in actions:   
                 done = True
 
               else:
+
+                #write('|SS')
+                #wrtie('|#I#2#12#New Message Scan#Scanning: |&1...#')
+
                 mailbase = getmbaseid(items[selbar]['id'])
+                mailbase['groupid'] = items[selbar]['groupid']
 
                 # index messages
                 index_msgs(items[selbar]['id'])
 
                 # initialize last message (first result from function)                
                 last_msg_num = get_last_read_msg_num()
-                
+
                 #exit if no msgs (check here for when msgs get deleted)
                 if msg_count == 0:    
 
@@ -1961,7 +2485,12 @@ def treelist():
                   msgdialog(' Mail ',s)
 
                 else:
-                  maillist(items[selbar]['id'])
+                  #write(str(items[selbar]))
+                  #write('|PN')
+                  maillist(items[selbar]['id'],items[selbar]['total'],items[selbar]['new'])
+
+                #clear messages
+                msgs = []
 
                 #update node status
                 menucmd('NA','rJAM - Viewing Mailbases')
@@ -1975,7 +2504,11 @@ def treelist():
                 if selbar > len(items) - 1:
                   selbar = 1
 
+                #write('|RS')
+                #TODO: only redraw CURRENT position!
+                redraw_bg = True
                 redraw = True
+                current_group_id = None
 
           elif key == KEY_CTRLA:
 
@@ -1995,12 +2528,15 @@ def treelist():
               # reposition selection bar
               selbar, top = set_area()
 
-              drawbackground()
+              #drawbackground()
+              redraw_bg = True
               redraw = True
 
           elif key == KEY_CTRLN:
-
-            mailbase = getmbaseid(current_mbase)
+            #TODO: current_mbase or items[selbar]['id']?
+            #mailbase = getmbaseid(current_mbase)
+            mailbase = getmbaseid(user['mbase'])
+            mailbase['groupid'] = items[selbar]['groupid']
 
             write('|#X#2##20#6#60#10#')
             write('|[X22|[Y08|07Send to    |08[.......................]')
@@ -2009,7 +2545,8 @@ def treelist():
             #gotoxy(1,1)
             #write(str(mailbase['flags']))
 
-            if mailbase['nettype'] == 1 or mailbase['flags'] == 68:
+            if mailbase['nettype'] == 1:
+            #if not bool(mailbase['flags'] & MB_Private):
               to = getstr(11, 23, 23, "All")
             else:
               to = getstr(11, 23, 23, "")
@@ -2028,26 +2565,40 @@ def treelist():
                 subject = subject.replace(' ','_')  #spaces bug the receiver..
                 subject = subject.replace('/F','\F')  #/F is seen as /FORCED no matter what
 
-                #only use first private for local mail
-                if mailbase['nettype'] == 0 and mailbase['flags'] != 68:
-                  #if current_mbase == config.private_bases[0]:
+                #only use MW on local mail and private base
+                if mailbase['nettype'] == 0 and bool(mailbase['flags'] & MB_Private):
+                
                   menucmd('MW','/to:'+to+' /subj:'+subject)
-                elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1 or mailbase['flags'] == 68:
+                else:
+                #elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1 or mailbase['flags'] == 68:
                   #netmail nettype == 3
                   write('|CL')
                   write('|IF')
                   menucmd('MP','/to:'+to+' /subj:'+subject)
 
-            drawbackground()
-            redraw_hdr = True  
+            #drawbackground()
+            #redraw_hdr = True  
+            #redraw = True
+            redraw_bg = True
             redraw = True
+            current_group_id = None
+
 
           elif key == KEY_CTRLS:
 
+            #TODO: 
+            # - get search input
+            # - index_search_msg(search string)
+            # - maillist(-1, total found, 0 (newmsgs)) // never show newmsgs in search mode
+            
             write(config.clearscr)
             menucmd('MS','C')
-            redraw_hdr = True
+
+            redraw_bg = True
             redraw = True
+            current_group_id = None
+            #redraw_hdr = True
+            #redraw = True
           
           elif key == KEY_CTRLP:
               write('|#X#2##09#12#69#16#|[Y12')
@@ -2082,14 +2633,17 @@ def treelist():
               redraw = True
 
           elif key == KEY_CTRLU:
+              write('|SS')
 
               if items[selbar]['subbed'] == 1:
-                write_msgbase_subscription(current_mbase, 0)
+                #write_msgbase_subscription(current_mbase, 0)
+                write_msgbase_subscription(user['mbase'], 0)
                 items[selbar]['subbed'] = 0
                 s = config.unsub_from_str.replace('|&1',items[selbar]['name'])
                 msgdialog(' Unsubscribe ',s)
               elif items[selbar]['subbed'] == 0:
-                write_msgbase_subscription(current_mbase, 1)
+                #write_msgbase_subscription(current_mbase, 1)
+                write_msgbase_subscription(user['mbase'], 1)
                 items[selbar]['subbed'] = 1
                 s = config.sub_to_str.replace('|&1',items[selbar]['name'])
                 msgdialog(' Subscribe ',s)
@@ -2102,25 +2656,27 @@ def treelist():
 
               # reposition selection bar
               #if 'ALL' not in actions or viewmode == "SUB":
-              
+              write('|RS')
               selbar, top = key_down(selbar, top)
               selbar, top = key_up(selbar, top)
               #selbar, top = set_area()              
               redraw = True
+              
 
 
           elif key == KEY_ESCAPE or key == 'Q':
               done = True
  
           elif key == 'H' or key == KEY_CTRLZ:    
+              write('|SS')
               write('|07|16|CL')
 
               showfile(rjamdir+'groups_help.ans',0,False,False,False)
 
               gotoxy(1,24)
               pause(True)
-
-              redraw = True
+              write('|RS')
+              #redraw = True
 #------------------------------------------------------------------------------
 
 
@@ -2128,8 +2684,18 @@ def treelist():
 # Mail list
 ################################################################################################################################
 
+def exist_at_index(obj, index):
+    """Check if a value exists at a given index/key in a sequence or mapping."""
+    try:
+        return index in obj if hasattr(obj, '__contains__') else bool(obj[index] or True)
+    except (IndexError, KeyError, TypeError):
+        return False
+
 #------------------------------------------------------------------------------
-def maillist(mbaseid):
+#get rid of mbaseid here totally unnecessary
+#make sure to set_area() first when opening maillist, user['mbase'] is only read on initial run and updated during treelist
+#but not when newmessage scan skips treelist if only one mailbase
+def maillist(mbaseid, total_msgs=0, new_msgs=0):
   global last_msg_num
   global msgtext
   #global basename
@@ -2141,13 +2707,19 @@ def maillist(mbaseid):
   global msgbase #to close msgbase on leaving the mail list
   global mailbase
    
+  global hdrlines 
+  global current_msg
+
+  #hdrlines = config2.getint('reader','max_header_lines')
+  
   #msg_hdr_line_mod = 0
+  current_msg = 1
 
   top_body  = 0
   top       = 0
   selbar    = -1
   done      = False
-  start_y   = mci_extract_y(config.hdr_startpos)
+  start_y   = mci_extract_y(config2.get('reader','startpos'))
   msgtext   = None
   msglines  = 0
   echohdr   = False
@@ -2155,8 +2727,10 @@ def maillist(mbaseid):
   count = 0
 
   private_base = False
+  #TODO move mailbase from here to within loop-- keep track of old/newmailbase and update header likewise
   mailbase = getmbaseid(mbaseid)
-  if mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
+  #if mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
+  if bool(mailbase['flags'] & MB_Private):
     private_base = True
 
   menucmd('NA','rJAM - Reading Messages')
@@ -2165,42 +2739,63 @@ def maillist(mbaseid):
   #logerror('test')
   #logerror(str(msgbase))
 
-  if last_msg_num > 0:
+  #if less messages then hdrlines possible
+  if len(msgs) < hdrlines:
+    top = 0
     while selbar == -1 and count < msg_count:
-      if msgs[count]['msg_number'] > last_msg_num:
-        ## OLD! - if (user['mbase'] not in config.private_bases and 'YOU' not in actions) or ((user['mbase'] in config.private_bases or 'YOU' in actions) and (user["handle"].upper() == msgs[count]['msg_to'].upper() or user["name"].upper() == msgs[count]['msg_to'].upper())):
-        
-        #always jump to correct new message, also when only your mail is searched
-        #if (not private_base and 'YOU' not in actions) or ((private_base or 'YOU' in actions) and (user["handle"].upper() == msgs[count]['msg_to'].upper() or user["name"].upper() == msgs[count]['msg_to'].upper())):
+        if msgs[count]['msg_number'] > last_msg_num:
           selbar = count
-          top = selbar
-          break
-    
-      count += 1
+          current_msg += 1
+
+        count += 1
+
   else:
-    selbar = 0
+  # if more messages then hdrlines
+    if last_msg_num > 0:
+      while selbar == -1 and count < msg_count:  
+        if msgs[count]['msg_number'] > last_msg_num:
+          ## OLD! - if (user['mbase'] not in config.private_bases and 'YOU' not in actions) or ((user['mbase'] in config.private_bases or 'YOU' in actions) and (user["handle"].upper() == msgs[count]['msg_to'].upper() or user["name"].upper() == msgs[count]['msg_to'].upper())):
+          
+          #always jump to correct new message, also when only your mail is searched
+          #if (not private_base and 'YOU' not in actions) or ((private_base or 'YOU' in actions) and (user["handle"].upper() == msgs[count]['msg_to'].upper() or user["name"].upper() == msgs[count]['msg_to'].upper())):
+            selbar = count
+            top = selbar
+
+            # this works for public mail bases
+            if new_msgs > hdrlines or private_base == False:
+              current_msg = total_msgs - new_msgs + 1
+
+            # this triggers is less new messages than msg header lines, or if private base
+            else: 
+              #this is a HEAVY approximation
+              #current_msg = total_msgs - (msg_count - count) + 1
+              
+              #this works if there are less new msgs than the message lines in header
+              current_msg = total_msgs - (len(msgs) - count) + 1
+            break
+      
+        count += 1
+    else:
+      selbar = 0
+      current_msg = 1
 
   #start at end if no lastread message found
   if selbar == -1:
     selbar = msg_count-1
-    top = msg_count-config.max_header_lines-1
+    top = msg_count-hdrlines-1
+    current_msg = total_msgs
 
   #make sure no gap at bottom
-  elif selbar > msg_count-config.max_header_lines - 1:
-    top = msg_count - config.max_header_lines - 1
+  elif selbar > hdrlines - 1:
+    top = msg_count - hdrlines - 1
 
   #adjust top if necessary
   if top<0:
     top = 0
 
-  
   drawbackground()
 
-  write(mci_adjust_y(config.msg_body_startpos,-2))
-  write(config.mid_first)
-  write(mci_adjust_y(config.msg_body_startpos,-1))
-  write(config.mid_second)
-
+  prevmailhdr = None
   redraw_hdr = True
 
   # MAIN LOOP
@@ -2212,18 +2807,31 @@ def maillist(mbaseid):
     # draw message headers  
     if redraw_hdr == True:
 
-      while y-top<=config.max_header_lines: #+msg_hdr_line_mod: 
+      #draw header
+      if prevmailhdr == None or (exist_at_index(msgs[selbar],'mbase') and msgs[selbar]['mbase'] <> prevmailhdr):
+          prevmailhdr = mailbase['id']
+          ypos = mci_extract_y(config2.get('body','msg_body_startpos'))+2
+          write('|#X#2##4#'+str(ypos).zfill(2)+'#44#'+str(ypos+4).zfill(2)+'#')
+          gotoxy(5,ypos+2)
+          write(' |14>> |15'+mailbase['name'])
 
-        pos = mci_adjust_y(config.hdr_startpos,y-top)      
+      #gotoxy(1,1)
+      #write(str(current_msg)+' '+str(total_msgs)+' ')
+      if total_msgs > 0 and config2.getboolean('reader','adjustable_size') == False:
+        updatebar(config2.get('reader','barpos'), current_msg, total_msgs, config2.getint('reader','max_header_lines'), True, redraw_hdr)
+
+      while y-top<=hdrlines: #+msg_hdr_line_mod: 
+
+        pos = mci_adjust_y(config2.get('reader','startpos'),(y*config2.getint('reader','header_lines'))-(top*config2.getint('reader','header_lines')))      
         write(pos)
 
         if y<msg_count:                  
           msg = msgs[y]
         
           if selbar == y:    
-            s = config.hdr_str_selected        
+            s = config2.get('reader','hdr_str_selected') #config.hdr_str_selected        
           else:
-            s = config.hdr_str      
+            s = config2.get('reader','hdr_str_new') #config.hdr_str      
           
           if selbar == y:
             setpinfo(8, '|08'+chr(250))
@@ -2236,7 +2844,7 @@ def maillist(mbaseid):
             #if ('YOU' not in actions and user['mbase'] not in config.private_bases) or (user["handle"].upper() == msgs[y]['msg_to'].upper() or user["name"].upper() == msgs[y]['msg_to'].upper()):
             #if ('YOU' not in actions and not private_base) or (user["handle"].upper() == msgs[y]['msg_to'].upper() or user["name"].upper() == msgs[y]['msg_to'].upper()):
             if selbar != y:    
-              s = config.hdr_str_new
+              s = config2.get('reader','hdr_str_new') #config.hdr_str_new
             setpinfo(8, '|14*')
             #else:
               #setpinfo(8, '|05>')
@@ -2244,28 +2852,51 @@ def maillist(mbaseid):
             setpinfo(8, ' ')
                   
           setpinfo(1, msg['msg_subject'])        
-          setpinfo(2, msg['msg_from'])
-          setpinfo(3, msg['msg_to'])
+          setpinfo(2, msg['msg_from'][:17])
+          setpinfo(3, msg['msg_to'][:17])
           setpinfo(4, msg['msg_date'])
 
           write(s)
         else:
-          s = config.hdr_str      
+          s = config2.get('reader','hdr_str_blank') #config.hdr_str      
+
           setpinfo(1, '')        
           setpinfo(2, '')
           setpinfo(3, '')
           setpinfo(4, '         ')
           setpinfo(8, '')
           setpinfo(9, '')
-          write(s)
+          write(s+' ')
           
         y += 1    
 
+      if config2.getboolean('reader','adjustable_size'):
+        write(mci_adjust_y(config2.get('body','msg_body_startpos'),-1))
+        write(config.mid_first)
+      #write(mci_adjust_y(config2.get('body','msg_body_startpos'),0))
+      #write(config.mid_second)
+
+      #write(mci_adjust_y(config.msg_body_startpos,-2))
+      #write(mci_adjust_y(config2.get('reader','startpos'),config2.getint('reader','max_header_lines')+1))
+      #write(config.mid_first)
+      #write(mci_adjust_y(config.msg_body_startpos,-1))
+      #write(mci_adjust_y(config2.get('reader','startpos'),config2.getint('reader','max_header_lines')+2))
+      #write('|[K')
+      #write(config.mid_second)
 
       top_body = 0    
       redraw_hdr = False  
       msgtext = None
 
+      if config2.getboolean('body','show_details'):
+        setpinfo(1, msgs[selbar]['msg_from'])
+        setpinfo(2, msgs[selbar]['msg_to'])
+        setpinfo(3, msgs[selbar]['msg_date'])
+        setpinfo(4, msgs[selbar]['msg_subject'])
+        write(config2.get('body','details_str'))
+      
+      # SAVE SCREEN
+      write('|SS')
 
     top_body = draw_msg_body(msgs[selbar],selbar,top_body,False,echohdr)
 
@@ -2277,29 +2908,40 @@ def maillist(mbaseid):
       if key == KEY_UP:
         redraw_hdr = True      
         selbar -= 1
+        current_msg -= 1
+        if current_msg < 1:
+          current_msg = 1
 
         if selbar < 0:
             selbar = 0
             if not load_prevmsg(msgs[selbar]['msg_number']):
               redraw_hdr = False
+            #else:
+            #  current_msg -= 1
 
         if selbar < top:
             top = selbar    
 
+        
+
       elif key == KEY_DOWN:
         redraw_hdr = True      
         selbar += 1
+        current_msg += 1
+        if current_msg > total_msgs:
+          current_msg = total_msgs
 
         if selbar >= msg_count: 
             selbar = msg_count-1
             if load_nextmsg(msgs[selbar]['msg_number']):
               selbar = msg_count-1
               top += 1
+              #current_msg += 1
             else:  
               redraw_hdr = False
             
 
-        elif selbar > top+config.max_header_lines: 
+        elif selbar > top+hdrlines: 
             top += 1
 
       elif key == KEY_LEFT:
@@ -2310,49 +2952,77 @@ def maillist(mbaseid):
 
       elif key == KEY_PGUP:
         redraw_hdr = True
-        selbar = selbar - config.max_header_lines - 1
+        selbar = selbar - hdrlines - 1
+        if current_msg > 1:
+          current_msg -= hdrlines + 1
+          if current_msg < 1:
+            current_msg = 1
+        else:
+          #this is the LAZY way to avoid redraw!
+          #we should create a check based on prevmsg or something
+          redraw_hdr = False
+
         if selbar < 0:
             for i in range(0, selbar, -1):
+              #current_msg += 1
               selbar = 0
               load_prevmsg(msgs[selbar]['msg_number'])
-            
+              #current_msg -= 1
+
             selbar = 0
             top = 0
+            #current_msg = 0
         else:
-            top = top - (config.max_header_lines) - 1
+            #current_msg = 0
+            top = top - hdrlines - 1
+            #current_msg -= hdrlines - 1
             if top < 0:
                 top = 0
 
       elif key == KEY_PGDN:
         redraw_hdr = True
-        selbar = selbar+config.max_header_lines + 1
+        selbar = selbar+hdrlines + 1
+        if current_msg < total_msgs:
+          current_msg += hdrlines + 1
+          if current_msg > total_msgs:
+            current_msg = total_msgs
+        else:
+          #this is the LAZY way to avoid redraw!
+          #we should create a check based on prevmsg or something
+          redraw_hdr = False
+
         if selbar > msg_count - 1:
             for i in range(msg_count - 1, selbar, 1):
+              #current_msg -= 1
               selbar = msg_count - 1
+              
               if load_nextmsg(msgs[selbar]['msg_number']):
+                  #current_msg += 1
                   selbar = msg_count-1
                   top += 1
+                  #current_msg += 1
         
-        top = top+(config.max_header_lines) + 1
+        top = top+(hdrlines) + 1
         
-        if top > msg_count-1-(config.max_header_lines):
-            top = msg_count-1-(config.max_header_lines)
+        if top > msg_count-1-hdrlines:
+            top = msg_count-1-hdrlines
             if top < 0:
                 top = 0
 
       elif key == KEY_END:
         
         get_msgs( msg_lastID )
-
+        current_msg = total_msgs
 
         redraw_hdr = True
         selbar=msg_count-1
-        if msg_count-config.max_header_lines-1 > 0:
-            top = msg_count-(config.max_header_lines)-1
+        if msg_count-hdrlines-1 > 0:
+            top = msg_count-hdrlines-1
         else:
             top = 0
 
       elif key == KEY_HOME:
+        current_msg = 1
         get_msgs(0)
         redraw_hdr = True
         selbar = 0
@@ -2367,8 +3037,8 @@ def maillist(mbaseid):
         else:
           debug = True
 
-      if key == KEY_ESCAPE or key == 'Q':
-        clrscr()
+      if key == KEY_ESCAPE or key == 'Q' or key == KEY_TAB:
+        #clrscr()
         done = True
 
       if key == 'V':
@@ -2396,10 +3066,37 @@ def maillist(mbaseid):
         sysoplog(1,'rJAM - Replying to message - ' + msgs[selbar]['msg_from'] + ' - ' + msgs[selbar]['msg_subject'])
 
         #if basename == "EMAIL":
-        if mailbase['nettype'] == 0 and mailbase['flags'] != 68:
+        #if issysop():
+        #    writeln('  '+to+'|PN')
+            #writeln('   '+str(mailbase['nettype']))
+            #writeln('   '+bin(mailbase['flags'])[2:].zfill(8))
+            #writeln('   PVT '+str(bool(mailbase['flags'] & MB_Private)))
+            #writeln('   PVT '+str(bool(mailbase['flags'] & MB_Autosigs))+'|PN')
+            
+        #only use MW on local mail and private base
+        if mailbase['nettype'] == 0 and bool(mailbase['flags'] & MB_Private):
+        
+        # SO WE CAN ONLY HAVE ONE LOCAL PRIVATE MSG BOX, ALL OTHER LOCAL MSG BASES NEED TO BE PUBLIC
+
+        #if 2==1:
+        #if mailbase['nettype'] == 0: # and mailbase['flags'] != 68:
           #if user['mbase'] in config.private_bases:                  
+                    # NetType //0=Local 1=Echo 2=News 3=Net
+                    # 1 =  0 
+                    # 27 = 3
+                    # 71 = 2
+                    # 73 = 2
+                    # 41 = 1
+                    # FLAGS
+                    # 1 =  01010000 localmsg          MW
+                    # 27 = 01010100 netmail           
+                    # 71 = 01010000 TEST2             
+                    # 73 = 01000100 general public    MP
+                    # 41 = 01000100 echo public       MP
+
           menucmd('MW','/to:'+to+' /subj:'+subject)
-        elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1 or mailbase['flags'] == 68:
+        #elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1: # or mailbase['flags'] == 68:
+        else:
           msgtext = get_msg_body(selbar, msgs[selbar],True)
           msgtext = multiple_replace(msgtext, config.rep)
           msgtext = utf_to_ascii( msgtext )
@@ -2417,7 +3114,9 @@ def maillist(mbaseid):
             menucmd('MP','/to:'+to+' /subj:'+subject)
           
         redraw_hdr = True
-        drawbackground()
+        #drawbackground()
+        write('|RS')
+
 
       if key == 'F':
 
@@ -2447,17 +3146,20 @@ def maillist(mbaseid):
           if subject.find('Fw:') == -1:
             subject = 'Fw:_'+subject
 
-          #if basename == "EMAIL":
-          if mailbase['nettype'] == 0:
+          #only use MW on local mail and private base
+          if mailbase['nettype'] == 0 and bool(mailbase['flags'] & MB_Private):
+
             #if user['mbase'] in config.private_bases:                  
             menucmd('MW','/to:'+to+' /subj:'+subject)
-          elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1:
+          else:
+          #elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1:
             write('|CL')
             menucmd('MP','/to:'+to+' /subj:'+subject+' /addr: ')
 
-        drawbackground()
-        redraw_hdr = True
-        #redraw = True
+        #drawbackground()
+        write('|RS')
+        redraw_hdr = True    
+        #redraw = True 
 
       elif key == KEY_ENTER:
 
@@ -2495,29 +3197,37 @@ def maillist(mbaseid):
 
             sysoplog(1,'rJAM - Writing new message - ' + to + ' - ' + subject)
 
-            #only use first private for local mail
-            if mailbase['nettype'] == 0:
+            #only use MW on local mail and private base
+            if mailbase['nettype'] == 0 and bool(mailbase['flags'] & MB_Private):
+
               #if mbaseid == config.private_bases[0]:
               menucmd('MW','/to:'+to+' /subj:'+subject)
-            elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1:
+            else:
+            #elif mailbase['nettype'] == 3 or mailbase['nettype'] == 1:
               write('|CL')
               write('|IF')
               menucmd('MP','/to:'+to+' /subj:'+subject)
 
             #load new message at end of 
-            load_nextmsg(msgs[len(msgs)-1]['msg_number'])
+            if load_nextmsg(msgs[len(msgs)-1]['msg_number']):
+              total_msgs += 1
             
-        drawbackground()
+        #drawbackground()
+        write('|RS')
         redraw_hdr = True    
-        redraw = True 
+        #redraw = True 
 
-      elif key == '[':
-          if config.max_header_lines > 1:
-            config.max_header_lines -= 1
-            config.msg_body_startpos = mci_adjust_y(config.msg_body_startpos,-1)
-            config.max_body_lines += 1
+      elif key == '[' and config2.getboolean('reader','adjustable_size'):
+          if hdrlines > 1:
+            #config2.set('reader','max_header_lines', config2.getint('reader','max_header_lines')-1 )
+            hdrlines -= 1
+            config2.set('body','max_body_lines', config2.getint('body','max_body_lines')+1 )
+            #config2.getint('reader','max_header_lines') -= 1
+            #config.msg_body_startpos = mci_adjust_y(config.msg_body_startpos,-1)
+            config2.set('body','msg_body_startpos', mci_adjust_y(config2.get('body','msg_body_startpos'),-1))
+            #config.max_body_lines += 1
 
-            if selbar > top + config.max_header_lines:
+            if selbar > top + hdrlines:
               top += 1
 
             if selbar < 0:
@@ -2525,28 +3235,51 @@ def maillist(mbaseid):
       
             redraw_hdr = True
 
-            write(mci_adjust_y(config.msg_body_startpos,-2))
-            write(config.mid_first)
-            write(mci_adjust_y(config.msg_body_startpos,-1))
-            write(config.mid_second)
+            #write(mci_adjust_y(config.msg_body_startpos,-2))
+            #write(config.mid_first)
+            #write(mci_adjust_y(config.msg_body_startpos,-1))
+            #write(config.mid_second)
       
-      elif key == ']':
-          if config.max_header_lines < 10:
-            config.max_header_lines += 1
-            config.msg_body_startpos = mci_adjust_y(config.msg_body_startpos, 1)
-            config.max_body_lines += -1
+      elif key == ']' and config2.getboolean('reader','adjustable_size'):
+          if hdrlines < config2.getint('reader','max_header_lines'):
+            #config2.set('reader','max_header_lines', config2.getint('reader','max_header_lines')+1 )
+            hdrlines += 1
+            config2.set('body','max_body_lines', config2.getint('body','max_body_lines')-1 )
+            #config2.getint('reader','max_header_lines') += 1
+            #config.msg_body_startpos = mci_adjust_y(config.msg_body_startpos, 1)
+            config2.set('body','msg_body_startpos', mci_adjust_y(config2.get('body','msg_body_startpos'),1))
+
+            #config.max_body_lines += -1
           
-            if top > 0 and top < config.max_header_lines:
+
+            #increase messages when on start of messagebase
+            if selbar<hdrlines:
+              #gotoxy(1,1)
+              #write(str(len(msgs)))
+              load_nextmsg(msgs[len(msgs)-1]['msg_number'])
+                #selbar += 1
+            
+            #load prev message when in end of messagebase
+            if y-top<=hdrlines:
+              if load_prevmsg(msgs[0]['msg_number']):
+                selbar += 1
+                top += 1
+                #top -= 1
+                #if selbar < len(msgs) - 1:
+                #  selbar += 1
+
+
+            if top > 0 and top < hdrlines:
               top -= 1
-            elif top > msg_count - config.max_header_lines - 1 and msg_count > config.max_header_lines:
+            elif top > msg_count - hdrlines - 1 and msg_count > hdrlines:
               top -= 1
-      
+
             redraw_hdr = True
 
-            write(mci_adjust_y(config.msg_body_startpos,-2))
-            write(config.mid_first)
-            write(mci_adjust_y(config.msg_body_startpos,-1))
-            write(config.mid_second)
+            #write(mci_adjust_y(config.msg_body_startpos,-2))
+            #write(config.mid_first)
+            #write(mci_adjust_y(config.msg_body_startpos,-1))
+            #write(config.mid_second)
 
 
       elif key == 'S':
@@ -2558,13 +3291,15 @@ def maillist(mbaseid):
           
           #only allow delete of send and received messages
           private_base = False
-          if mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
+          #if mailbase['nettype'] == 0 or mailbase['nettype'] == 3:
+          if bool(mailbase['flags'] & MB_Private):
             private_base = True
 
           #if issysop() or (user['mbase'] in config.private_bases and msgs[selbar]['msg_to'].upper() == user['handle'].upper() or msgs[selbar]['msg_from'].upper() == user['handle'].upper() or msgs[selbar]['msg_to'].upper() == user['name'].upper() or msgs[selbar]['msg_from'].upper() == user['name'].upper()):
           if issysop() or (private_base and msgs[selbar]['msg_to'].upper() == user['handle'].upper() or msgs[selbar]['msg_from'].upper() == user['handle'].upper() or msgs[selbar]['msg_to'].upper() == user['name'].upper() or msgs[selbar]['msg_from'].upper() == user['name'].upper()):
 
             delete_msg_num(selbar, msgs[selbar])
+            total_msgs -= 1
 
             s = config.delete_msg
             msgdialog(' Delete ',s)
@@ -2580,150 +3315,235 @@ def maillist(mbaseid):
               top = 0
 
             redraw_hdr = True
+            write('|RS')
 
   msg_close(msgbase)
 
 #------------------------------------------------------------------------------
 
 
+#------------------------------------------------------------------------------------------------------
+# replace prompts
+#------------------------------------------------------------------------------------------------------
+
+def replace_prompts():
+  
+  global prompt_108
+  global prompt_109
+  global prompt_119
+
+  #108 Sent private message to
+  prompt_108 = getprompt(108)
+  setprompt(108, '|IF|00')
+
+  #109 message aborted, press enter
+  prompt_109 = getprompt(109)
+  setprompt(109, '|IF|00')
+
+  #119 Post message to
+  prompt_119 = getprompt(119)
+  setprompt(119, '|IF|00')
+
+
+#------------------------------------------------------------------------------
+# restore prompts
+#------------------------------------------------------------------------------
+def restore_prompts():
+
+  global prompt_108
+  global prompt_109
+  global prompt_119
+
+  #108 Sent private message to
+  setprompt(108, prompt_108)
+
+  #109 message aborted, press enter
+  setprompt(109, prompt_109)
+
+  #119 Post message to
+  setprompt(119, prompt_119)
+
+  
+
 ######################################################################################################################
 # MAIN
 ######################################################################################################################
 
-#------------------------------------------------------------------------------
-cfg           = getcfg()   
-user          = getuser(0) 
+def main():
 
-current_mbase = user['mbase']
-file          = ""
-msg_count     = 0
-sysop_level   = int(re.findall(r'\d+', cfg['sysopacs'])[0])
-viewmode      = "SUB"
-mailbase      = False
+  #global config2
 
-actions = []
+  global actions
+  global cfg
+  global user
+  global viewmode
+  global items
+  #global current_mbase
+  global sysop_level
+   
+  #------------------------------------------------------------------------------
+  cfg           = getcfg()   
+  user          = getuser(0) 
+  #gotoxy(1,1)
+  #writeln(str(user['mbase'])+"    ")
+  #sleep(1)
 
-#temporaly only show mail addressed to you in netmail/email/private
-#actions.append('NOFROM')
+  #TODO: could be removed if we use user['mbase'] instead everywhere
+  #current_mbase = user['mbase']
+  file          = ""
+  msg_count     = 0
+  sysop_level   = int(re.findall(r'\d+', cfg['sysopacs'])[0])
+  viewmode      = "SUB"
+  mailbase      = False
 
-i = 1
-while i <= param_count():
-  arg = param_str(i).upper()  
-  
-  if arg == "/YOU":
-    actions.append('YOU')
+  actions = []
 
-  #could be done with menu command and then list
-  elif arg == "/EMAIL":
-    actions.append('EMAIL')
+  load_config()
 
-  elif arg == "/EMAILNETMAIL":
-    actions.append('EMAILNETMAIL')
+  global hdrlines
+  hdrlines = config2.getint('reader','start_header_lines')
 
-  elif arg == "/NOFROM":
-    actions.append('NOFROM')
+  #temporaly only show mail addressed to you in netmail/email/private
+  #actions.append('NOFROM')
+  replace_prompts()
 
-  elif arg == "/MAILLIST":
-    actions.append('MAILLIST')
+  i = 1
+  while i <= param_count():
+    arg = param_str(i).upper()  
+    
+    if arg == "/YOU":
+      actions.append('YOU')
 
-  elif arg == "/AREASELECT":
-    actions.append('AREASELECT')
+    #could be done with menu command and then list
+    elif arg == "/EMAIL":
+      actions.append('EMAIL')
 
-  elif arg == "/NEW":
-    actions.append('NEW')
+    elif arg == "/EMAILNETMAIL":
+      actions.append('EMAILNETMAIL')
 
-  elif arg == "/ALL":
-    actions.append('ALL')
-    viewmode = "ALL"
+    elif arg == "/NOFROM":
+      actions.append('NOFROM')
 
-  #not implemented yet - split or full message reader  
-  #elif arg == "/SPLIT":
-  #  actions.append('SPLIT')
+    elif arg == "/MAILLIST":
+      actions.append('MAILLIST')
 
-  elif arg == "/CHANGEAREA":
-    actions.append('CHANGEAREA')
-    arg = param_str(i+1)
-    if arg == "-":
-      actions.append('BACKWARD')
-    elif arg == "+":
-      actions.append('FORWARD')
+    elif arg == "/AREASELECT":
+      actions.append('AREASELECT')
+
+    elif arg == "/NEW":
+      actions.append('NEW')
+
+    elif arg == "/ALL":
+      actions.append('ALL')
+      viewmode = "ALL"
+
+    #not implemented yet - split or full message reader  
+    #elif arg == "/SPLIT":
+    #  actions.append('SPLIT')
+
+    elif arg == "/CHANGEAREA":
+      actions.append('CHANGEAREA')
+      arg = param_str(i+1)
+      if arg == "-":
+        actions.append('BACKWARD')
+      elif arg == "+":
+        actions.append('FORWARD')
+      i += 1
+
     i += 1
 
-  i += 1
+  #moved from if block
+  get_mailbases()
 
-#moved from if block
-get_mailbases()
+  if 'CHANGEAREA' in actions:
+    #moved up to make sure that the following else block can read through mailbases
+    #get_mailbases()
+    get_subscriptions()
 
-if 'CHANGEAREA' in actions:
-  #moved up to make sure that the following else block can read through mailbases
-  #get_mailbases()
-  get_subscriptions()
-
-  res = []
-  for i in range(len(mailbases)):
-    if mailbases[i]['subbed'] > 0:
-      res.append(mailbases[i])
-
-  for i in range(len(res)):
-      
-      if res[i]['id'] == current_mbase:
-
-        next = i
-        if "BACKWARD" in actions:
-          next -= 1
-        elif "FORWARD" in actions:
-          next += 1     
-
-        if next < 0:
-          next = len(res)-1
-        elif next > len(res)-1:
-          next = 0
-
-        if res[next]['groupid'] != -1:
-          menucmd('MG',str(res[next]['groupid']))
-        menucmd('MA',str(res[next]['id'])) 
-
-else:
-
-  if "MAILLIST" in actions or "EMAIL" in actions:  
+    res = []
+    for i in range(len(mailbases)):
+      if mailbases[i]['subbed'] > 0:
+        res.append(mailbases[i])
     
-    #private localmail
-    if "EMAIL" in actions: 
+    for i in range(len(res)):
+        #TODO: could be user['mbase'], CHANGED GET_SUBSCRIPTIONS TO AVOID CHANGING USER['mbase']!!
+        #if res[i]['id'] == current_mbase:
+        if res[i]['id'] == user['mbase']:
 
-      #try to find email base (localmail)
-      for i in range(len(mailbases)):
-        if mailbases[i]['nettype'] == 0: 
-          mailbase = getmbaseid(mailbases[i]['id'])        
-          index_msgs(mailbases[i]['id'])
-          last_msg_num = get_last_read_msg_num()
-          maillist(mailbases[i]['id'])
+          next = i
+          if "BACKWARD" in actions:
+            next -= 1
+          elif "FORWARD" in actions:
+            next += 1     
+
+          if next < 0:
+            next = len(res)-1
+          elif next > len(res)-1:
+            next = 0
+
+          if res[next]['groupid'] != -1:
+            menucmd('MG',str(res[next]['groupid']))
+          menucmd('MA',str(res[next]['id'])) 
+
+          #gotoxy(1,2)
+          #writeln(str(user['mbase'])+"    ")
+          #writeln(str(res[next]['id'])+"   ")          
           break
 
+    #if tmpid != None:
+    #  user['mbase'] = tmpid
 
+          #user['mbase'] = res[next]['id']
 
-      #index_msgs(config.private_bases[0])
-      #last_msg_num = get_last_read_msg_num()
-      #maillist(config.private_bases[0])
-
-    #current mailarea
-    else:      
-      mailbase = getmbaseid(user['mbase'])
-      index_msgs(user['mbase'])
-      last_msg_num = get_last_read_msg_num()
-      
-      if msg_count == 0:    
-        s = config.msg_no_messages.replace('|&1',mailbase['filename'].upper())
-        msgdialog(' Mail ',s)          #show dialog and exit
-
-      else:
-        maillist(user['mbase'])
-      
   else:
-    # group/area choice
-    items = loadmainlist()
-    if len(items) > 0:
-      treelist()
+
+    if "MAILLIST" in actions or "EMAIL" in actions:  
+      
+      #private localmail
+      if "EMAIL" in actions: 
+
+        #try to find email base (localmail)
+        for i in range(len(mailbases)):
+          #if mailbases[i]['nettype'] == 0: 
+          #only use MW on local mail and private base
+          if mailbase[i]['nettype'] == 0 and bool(mailbase[i]['flags'] & MB_Private):
+            mailbase = getmbaseid(mailbases[i]['id'])        
+            index_msgs(mailbases[i]['id'])
+            last_msg_num = get_last_read_msg_num()
+            maillist(mailbases[i]['id'])
+            break
+
+
+
+        #index_msgs(config.private_bases[0])
+        #last_msg_num = get_last_read_msg_num()
+        #maillist(config.private_bases[0])
+
+      #current mailarea
+      else:      
+        mailbase = getmbaseid(user['mbase'])
+        index_msgs(user['mbase'])
+        last_msg_num = get_last_read_msg_num()
+        
+        if msg_count == 0:    
+          s = config.msg_no_messages.replace('|&1',mailbase['filename'].upper())
+          msgdialog(' Mail ',s)          #show dialog and exit
+
+        else:
+          maillist(user['mbase'])
+        
+    else:
+      # group/area choice
+      items = loadmainlist()
+      if len(items) > 0:
+        treelist()
+
+  restore_prompts()
 
 #------------------------------------------------------------------------------
+
+
+if __name__ == '__main__':
+    main()
 
 ######################################################################################################################

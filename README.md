@@ -141,8 +141,9 @@ available areas rJAM will move to the other side of the list automatically.
 ## Keys
 
 ## Group/Area switcher
-CTRL-U - Subscribe / Unsubscribe from area
+CTRL-C / CTRL-P - Set all areas read (to current date)
 CTRL-A - Toggle between all or subscribed areas
+CTRL-U - Subscribe / Unsubscribe from area
 CTRL-N - New message (takes local private mail / netmail / public mail into account)
 CTRL-S - Search mail in current area
 Q      - Quit
@@ -159,11 +160,14 @@ LEFT/RIGHT - Jump to first/last area of message group / quick switch
 
 ## Message reader
 N - New message
+F - Forward message
 R - Reply to message
 K - Kludge display toggle (echomail message information)
 D - Delete message
 S - Set lastread index to current message
 Q - Quit
+ESC - Quit
+TAB - Quit
 
 [ - Decrease header size
 ] - Increase header size

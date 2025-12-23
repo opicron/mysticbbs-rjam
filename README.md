@@ -52,13 +52,15 @@ External mail group/area looper
 
 
 ## Configuration
-important: 
-             edit your default.ini file (and default.c132.ini widescreen config)
+edit your default.ini file (and default.c132.ini widescreen config)
 
 
 ## Installation
+
 Copy rjam.mpy to your /script/ folder
+
 Copy contents of /rjam/ to /script/rjam/ folder
+
 Execute rjam with the default Python script command in menu
 
 
@@ -141,45 +143,67 @@ available areas rJAM will move to the other side of the list automatically.
 ## Keys
 
 ## Group/Area switcher
+
 CTRL-C / CTRL-P - Set all areas read (to current date)
+
 CTRL-A - Toggle between all or subscribed areas
+
 CTRL-U - Subscribe / Unsubscribe from area
+
 CTRL-N - New message (takes local private mail / netmail / public mail into account)
+
 CTRL-S - Search mail in current area
+
 Q      - Quit
 
 ESC - Exit
+
 ENTER - View messages / select area if in SELECTAREA mode
 
 PAGEUP/PAGEDOWN - Jump backward/forward
+
 HOME/END - Jump to top/bottom
+
 UP/DOWN - Navigate messages
+
 LEFT/RIGHT - Jump to first/last area of message group / quick switch
 
 
-
 ## Message reader
+
 N - New message
+
 F - Forward message
+
 R - Reply to message
+
 K - Kludge display toggle (echomail message information)
+
 D - Delete message
+
 S - Set lastread index to current message
+
 Q - Quit
+
 ESC - Quit
+
 TAB - Quit
 
 [ - Decrease header size
+
 ] - Increase header size
 
 ESC - Exit reader
+
 ENTER - Mark as read
 
 PAGEUP/PAGEDOWN - Jump backward/forward
-HOME/END - Jump to top/bottom
-UP/DOWN - Navigate messages
-LEFT/RIGHT - Scroll message body
 
+HOME/END - Jump to top/bottom
+
+UP/DOWN - Navigate messages
+
+LEFT/RIGHT - Scroll message body
 
 
 ## Features

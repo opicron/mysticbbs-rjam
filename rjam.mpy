@@ -1856,7 +1856,7 @@ def draw_msg_body(msg,index,top=0,dumpquote=False,echohdr=False):
         #add newline
         f.write(' '+quote_from+'> '+stripmcicolor(msgtext[i])+'\r')
       else:
-        f.write(' '+quote_from+'> '+msgtext[i])
+        f.write(' '+quote_from+'> '+msgtext[i]+'\r')
         #f.write(' '+quote_from+'> '+color_code_to_ansi(msgtext[i])[0])
     return 
 
@@ -2031,7 +2031,7 @@ def drawbackground():
 
 #------------------------------------------------------------------------------
 def drawtreelist():
-  #write('|16|CL')
+  write('|16')
   group_ansi = find_display_custom(rjamdir+config2.get('ansi','group'))
   showfile(group_ansi,0,0,0,0)
   #write(config.mg_initscreen)
@@ -2184,7 +2184,7 @@ def treelist():
       #gotoxy(1,1)
       #write(str(mailbases))
       #write('|PN')
-      write('|CL')
+      write(config.clearscr)
 
       menucmd('MG',str(mailbases[len(mailbases)-1]['groupid']))
       menucmd('MA',str(mailbases[len(mailbases)-1]['id']))
